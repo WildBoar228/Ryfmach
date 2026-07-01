@@ -218,10 +218,18 @@ std::string_view PhonemeSpelling(Phoneme phoneme) noexcept {
             return "г";
         case Phoneme::kHSoft:
             return "г'";
+        case Phoneme::kG:
+            return "г*";
+        case Phoneme::kGSoft:
+            return "г*'";
         case Phoneme::kD:
             return "д";
-        case Phoneme::kDSoft:
-            return "д'";
+        case Phoneme::kDz:
+            return "дз";
+        case Phoneme::kDzSoft:
+            return "дз'";
+        case Phoneme::kDzh:
+            return "дж";
         case Phoneme::kZh:
             return "ж";
         case Phoneme::kZ:
@@ -262,8 +270,6 @@ std::string_view PhonemeSpelling(Phoneme phoneme) noexcept {
             return "с'";
         case Phoneme::kT:
             return "т";
-        case Phoneme::kTSoft:
-            return "т'";
         case Phoneme::kU:
             return "у";
         case Phoneme::kW:

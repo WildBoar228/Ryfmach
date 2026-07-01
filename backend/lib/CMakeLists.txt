@@ -4,6 +4,7 @@ set(BEL_LANG_SRC "${BEL_LANG_ENGINE_PATH}/src")
 add_library(
     bel_lang_engine
     ${BEL_LANG_SRC}/language.cpp
+    ${BEL_LANG_SRC}/sounds.cpp
 )
 
 target_include_directories(
