@@ -1,4 +1,5 @@
 #include "language.hpp"
+#include "rhymes.hpp"
 #include "sounds.hpp"
 #include "transcription.hpp"
 
@@ -189,6 +190,151 @@ TEST(Transcription, MatchesKnownWords) {
 
         ASSERT_TRUE(transcription.has_value());
         EXPECT_EQ(JoinTranscription(*transcription), test_case.expected);
+    }
+}
+
+TEST(Rhymes, BuildsWorkingPartForMistakeLevels) {
+    EXPECT_EQ(ryfmach::bel::WorkingPart("хата", 1, 0), "_а_та");
+    EXPECT_EQ(ryfmach::bel::WorkingPart("хата", 1, 1), "_а_ты");
+    EXPECT_EQ(ryfmach::bel::WorkingPart("хата", 1, 2), "_а_ты");
+    EXPECT_EQ(ryfmach::bel::WorkingPart("хата", 1, 3), "_а_фы");
+}
+
+TEST(Rhymes, KeepsPreviousSoundForFinalStressInStrictRhymes) {
+    EXPECT_EQ(ryfmach::bel::WorkingPart("дзень", 2, 0), "_э_н'");
+    EXPECT_EQ(ryfmach::bel::WorkingPart("дзень", 2, 1), "_э_н");
+    EXPECT_EQ(ryfmach::bel::WorkingPart("дзень", 2, 2), "_э_н");
+}
+
+TEST(Rhymes, MatchesKnownWorkingPartsAndHashes) {
+    struct MistakeCase {
+        int mistake;
+        std::string_view working_part;
+        std::uint64_t hash;
+    };
+
+    struct WordCase {
+        std::string_view word;
+        std::size_t stress;
+        std::vector<MistakeCase> mistakes;
+    };
+
+    const std::vector<WordCase> test_cases = {
+        {
+            "хата",
+            1,
+            {
+                {0, "_а_та", 445859199653511ULL},
+                {1, "_а_ты", 1226555324871529ULL},
+                {2, "_а_ты", 1226555324871529ULL},
+                {3, "_а_фы", 6004182820957543ULL},
+            },
+        },
+        {
+            "неба",
+            1,
+            {
+                {0, "_э_ба", 11088797979124984ULL},
+                {1, "_э_пы", 3485216863999811ULL},
+                {2, "_э_пы", 3485216863999811ULL},
+                {3, "_э_фы", 11105704373828186ULL},
+            },
+        },
+        {
+            "дзень",
+            2,
+            {
+                {0, "_э_н'", 10109537621506963ULL},
+                {1, "_э_н", 6803580395416928ULL},
+                {2, "_э_н", 6803580395416928ULL},
+                {3, "_э_л", 5555379031036954ULL},
+            },
+        },
+        {
+            "ксёндз",
+            2,
+            {
+                {0, "_о_нц", 1737930885662061ULL},
+                {1, "_о_нц", 1737930885662061ULL},
+                {2, "_о_лц", 8508750108388868ULL},
+                {3, "_о_с", 6525980150844431ULL},
+            },
+        },
+        {
+            "шчаўе",
+            2,
+            {
+                {0, "_а_ўйэ", 1160418455848226ULL},
+                {1, "_а_ўйы", 8679091878039836ULL},
+                {2, "_а_ы", 968517201168586ULL},
+                {3, "_а_ы", 968517201168586ULL},
+            },
+        },
+        {
+            "лодка",
+            1,
+            {
+                {0, "_о_тка", 577013656646148ULL},
+                {1, "_о_ткы", 11205430430294211ULL},
+                {2, "_о_ткы", 11205430430294211ULL},
+                {3, "_о_фы", 9835650543388685ULL},
+            },
+        },
+        {
+            "кніжка",
+            2,
+            {
+                {0, "_і_шка", 671887678995401ULL},
+                {1, "_і_шкы", 6167163906441582ULL},
+                {2, "_і_шкы", 6167163906441582ULL},
+                {3, "_і_фы", 7341684740097667ULL},
+            },
+        },
+        {
+            "касьба",
+            5,
+            {
+                {0, "б_а_", 8508740673753778ULL},
+                {1, "б_а_", 8508740673753778ULL},
+                {2, "_а_", 9525167144504378ULL},
+                {3, "_а_", 9525167144504378ULL},
+            },
+        },
+        {
+            "лічба",
+            1,
+            {
+                {0, "_і_джба", 8478135653608230ULL},
+                {1, "_і_чпы", 939249229248069ULL},
+                {2, "_і_шпы", 11402240861085748ULL},
+                {3, "_і_фы", 7341684740097667ULL},
+            },
+        },
+        {
+            "малацьба",
+            7,
+            {
+                {0, "б_а_", 8508740673753778ULL},
+                {1, "б_а_", 8508740673753778ULL},
+                {2, "_а_", 9525167144504378ULL},
+                {3, "_а_", 9525167144504378ULL},
+            },
+        },
+    };
+
+    for (const auto& test_case : test_cases) {
+        SCOPED_TRACE(test_case.word);
+
+        for (const auto& mistake_case : test_case.mistakes) {
+            SCOPED_TRACE(mistake_case.mistake);
+
+            EXPECT_EQ(ryfmach::bel::WorkingPart(
+                          test_case.word, test_case.stress, mistake_case.mistake),
+                      mistake_case.working_part);
+            EXPECT_EQ(ryfmach::bel::SoundHash(
+                          test_case.word, test_case.stress, mistake_case.mistake),
+                      mistake_case.hash);
+        }
     }
 }
 
