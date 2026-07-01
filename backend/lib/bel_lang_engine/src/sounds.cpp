@@ -88,7 +88,30 @@ bool IsSonorGroup(std::size_t group) noexcept {
 
 } // namespace
 
-bool IsConsonantSound(Phoneme sound) noexcept {
+std::string_view SoundSpelling(Sound sound) noexcept {
+    if (!sound.stressed) {
+        return PhonemeSpelling(sound.phoneme);
+    }
+
+    switch (sound.phoneme) {
+        case Phoneme::kA:
+            return "_а_";
+        case Phoneme::kO:
+            return "_о_";
+        case Phoneme::kU:
+            return "_у_";
+        case Phoneme::kI:
+            return "_і_";
+        case Phoneme::kY:
+            return "_ы_";
+        case Phoneme::kE:
+            return "_э_";
+        default:
+            return PhonemeSpelling(sound.phoneme);
+    }
+}
+
+bool IsConsonantPhoneme(Phoneme sound) noexcept {
     return GetConsonantData(sound).has_value();
 }
 
@@ -104,6 +127,14 @@ bool IsVowelSound(Phoneme sound) noexcept {
         default:
             return false;
     }
+}
+
+bool IsVowelSound(Sound sound) noexcept {
+    return IsVowelSound(sound.phoneme);
+}
+
+bool IsStressedVowel(Sound sound) noexcept {
+    return sound.stressed && IsVowelSound(sound);
 }
 
 bool IsRing(Phoneme sound) noexcept {
@@ -187,6 +218,13 @@ std::optional<Phoneme> HardPair(Phoneme sound) noexcept {
 }
 
 std::optional<Phoneme> SoftPair(Phoneme sound) noexcept {
+    if (sound == Phoneme::kDz) {
+        return Phoneme::kDzSoft;
+    }
+    if (sound == Phoneme::kTs) {
+        return Phoneme::kTsSoft;
+    }
+
     const auto data = GetConsonantData(sound);
     if (!data) {
         return std::nullopt;

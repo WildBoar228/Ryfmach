@@ -3,11 +3,21 @@
 #include "language.hpp"
 
 #include <optional>
+#include <string_view>
 
 namespace ryfmach::bel {
 
-bool IsConsonantSound(Phoneme sound) noexcept;
+struct Sound {
+    Phoneme phoneme;
+    bool stressed = false;
+};
+
+std::string_view SoundSpelling(Sound sound) noexcept;
+
+bool IsConsonantPhoneme(Phoneme sound) noexcept;
 bool IsVowelSound(Phoneme sound) noexcept;
+bool IsVowelSound(Sound sound) noexcept;
+bool IsStressedVowel(Sound sound) noexcept;
 
 bool IsRing(Phoneme sound) noexcept;
 bool IsThud(Phoneme sound) noexcept;

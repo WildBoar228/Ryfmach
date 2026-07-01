@@ -5,6 +5,7 @@ add_library(
     bel_lang_engine
     ${BEL_LANG_SRC}/language.cpp
     ${BEL_LANG_SRC}/sounds.cpp
+    ${BEL_LANG_SRC}/transcription.cpp
 )
 
 target_include_directories(
