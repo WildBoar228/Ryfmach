@@ -4,12 +4,86 @@
 #include "transcription.hpp"
 #include "utils/hash.hpp"
 
+#include <fstream>
+#include <sstream>
 #include <vector>
 
 namespace ryfmach::bel {
 namespace {
 
 constexpr std::uint64_t kSoundHashMod = 12345678901234277ULL;
+constexpr double kDefaultUnknownReplaceCost = 1000.0;
+constexpr std::size_t kPhonemeCount =
+    static_cast<std::size_t>(Phoneme::kE) + 1;
+constexpr std::size_t kStressedVowelCount = 6;
+
+// Keys: empty, base phonemes in Phoneme enum order, then stressed vowels.
+static_assert(
+    SoundCompatibilityTable::kSoundKeyCount ==
+    1 + kPhonemeCount + kStressedVowelCount);
+
+std::optional<std::size_t> StressedVowelIndex(Phoneme phoneme) noexcept {
+    switch (phoneme) {
+        case Phoneme::kA:
+            return 0;
+        case Phoneme::kO:
+            return 1;
+        case Phoneme::kU:
+            return 2;
+        case Phoneme::kI:
+            return 3;
+        case Phoneme::kY:
+            return 4;
+        case Phoneme::kE:
+            return 5;
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<std::size_t> SoundKey(std::optional<Sound> sound) noexcept {
+    if (!sound) {
+        return 0;
+    }
+
+    if (sound->stressed) {
+        if (const auto vowel_index = StressedVowelIndex(sound->phoneme)) {
+            return 1 + kPhonemeCount + *vowel_index;
+        }
+    }
+
+    const auto phoneme_index = static_cast<std::size_t>(sound->phoneme);
+    if (phoneme_index >= kPhonemeCount) {
+        return std::nullopt;
+    }
+    return 1 + phoneme_index;
+}
+
+bool ParseSoundKey(std::string_view key, std::optional<Sound>& sound) noexcept {
+    if (key == "<empty>") {
+        sound = std::nullopt;
+        return true;
+    }
+
+    for (std::size_t index = 0; index < kPhonemeCount; ++index) {
+        const auto phoneme = static_cast<Phoneme>(index);
+        const Sound unstressed{phoneme};
+        if (SoundSpelling(unstressed) == key) {
+            sound = unstressed;
+            return true;
+        }
+
+        if (StressedVowelIndex(phoneme)) {
+            const Sound stressed{phoneme, true};
+            if (SoundSpelling(stressed) == key) {
+                sound = stressed;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
 
 bool SameForIdealRhyme(Sound left, Sound right) noexcept {
     if (left.phoneme == right.phoneme && left.stressed == right.stressed) {
@@ -158,6 +232,100 @@ std::string JoinSounds(const std::vector<Sound>& sounds) {
 
 } // namespace
 
+SoundCompatibilityTable::SoundCompatibilityTable() {
+    costs_.fill(kDefaultUnknownReplaceCost);
+    SetCost(std::optional<Sound>{}, std::optional<Sound>{}, 0.0);
+}
+
+double SoundCompatibilityTable::Cost(Sound left, Sound right) const noexcept {
+    return Cost(std::optional<Sound>{left}, std::optional<Sound>{right});
+}
+
+double SoundCompatibilityTable::Cost(
+    std::optional<Sound> left,
+    std::optional<Sound> right) const noexcept {
+    const auto left_key = SoundKey(left);
+    const auto right_key = SoundKey(right);
+    if (!left_key || !right_key) {
+        return kDefaultUnknownReplaceCost;
+    }
+
+    return costs_[*left_key * kSoundKeyCount + *right_key];
+}
+
+void SoundCompatibilityTable::SetCost(Sound left, Sound right, double cost) noexcept {
+    SetCost(std::optional<Sound>{left}, std::optional<Sound>{right}, cost);
+}
+
+void SoundCompatibilityTable::SetCost(
+    std::optional<Sound> left,
+    std::optional<Sound> right,
+    double cost) noexcept {
+    const auto left_key = SoundKey(left);
+    const auto right_key = SoundKey(right);
+    if (!left_key || !right_key) {
+        return;
+    }
+
+    costs_[*left_key * kSoundKeyCount + *right_key] = cost;
+    costs_[*right_key * kSoundKeyCount + *left_key] = cost;
+}
+
+std::optional<SoundCompatibilityTable> LoadSoundCompatibilityTable(
+    const std::filesystem::path& path) {
+    std::ifstream input(path);
+    if (!input) {
+        return std::nullopt;
+    }
+
+    SoundCompatibilityTable table;
+
+    std::string line;
+    while (std::getline(input, line)) {
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+
+        std::istringstream line_stream(line);
+        std::string left_text;
+        std::string right_text;
+        std::string cost_text;
+        if (!std::getline(line_stream, left_text, '\t') ||
+            !std::getline(line_stream, right_text, '\t') ||
+            !std::getline(line_stream, cost_text)) {
+            return std::nullopt;
+        }
+
+        std::optional<Sound> left;
+        std::optional<Sound> right;
+        if (!ParseSoundKey(left_text, left) || !ParseSoundKey(right_text, right)) {
+            return std::nullopt;
+        }
+
+        try {
+            table.SetCost(left, right, std::stod(cost_text));
+        } catch (...) {
+            return std::nullopt;
+        }
+    }
+
+    return table;
+}
+
+const SoundCompatibilityTable& DefaultSoundCompatibilityTable() noexcept {
+    static const SoundCompatibilityTable table = [] {
+#ifdef RYFMACH_SOUND_COMPATIBILITY_PATH
+        if (const auto loaded =
+                LoadSoundCompatibilityTable(RYFMACH_SOUND_COMPATIBILITY_PATH)) {
+            return *loaded;
+        }
+#endif
+        return SoundCompatibilityTable();
+    }();
+
+    return table;
+}
+
 std::optional<std::string> WorkingPart(
     std::string_view word,
     std::size_t stress,
@@ -200,6 +368,30 @@ std::optional<std::uint64_t> SoundHash(
     }
 
     return utils::DigestModulo(utils::Sha1(*working_part), kSoundHashMod);
+}
+
+double ReplaceCost(Sound left, Sound right) noexcept {
+    return ReplaceCost(left, right, DefaultSoundCompatibilityTable());
+}
+
+double ReplaceCost(
+    Sound left,
+    Sound right,
+    const SoundCompatibilityTable& table) noexcept {
+    return table.Cost(left, right);
+}
+
+double ReplaceCost(
+    std::optional<Sound> left,
+    std::optional<Sound> right) noexcept {
+    return ReplaceCost(left, right, DefaultSoundCompatibilityTable());
+}
+
+double ReplaceCost(
+    std::optional<Sound> left,
+    std::optional<Sound> right,
+    const SoundCompatibilityTable& table) noexcept {
+    return table.Cost(left, right);
 }
 
 } // namespace ryfmach::bel

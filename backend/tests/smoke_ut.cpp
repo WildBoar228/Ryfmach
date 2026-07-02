@@ -5,6 +5,8 @@
 
 #include <gtest/gtest.h>
 
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -336,6 +338,53 @@ TEST(Rhymes, MatchesKnownWorkingPartsAndHashes) {
                       mistake_case.hash);
         }
     }
+}
+
+TEST(Rhymes, UsesDefaultSoundCompatibilityTable) {
+    using ryfmach::bel::Phoneme;
+    using ryfmach::bel::Sound;
+
+    EXPECT_DOUBLE_EQ(
+        ryfmach::bel::ReplaceCost(Sound{Phoneme::kB}, Sound{Phoneme::kP}),
+        3.5);
+    EXPECT_DOUBLE_EQ(
+        ryfmach::bel::ReplaceCost(
+            Sound{Phoneme::kA, true}, Sound{Phoneme::kP}),
+        40.0);
+    EXPECT_DOUBLE_EQ(
+        ryfmach::bel::ReplaceCost(std::optional<Sound>{}, std::optional<Sound>{}),
+        0.0);
+}
+
+TEST(Rhymes, LoadsSoundCompatibilityTableFromFile) {
+    using ryfmach::bel::Phoneme;
+    using ryfmach::bel::Sound;
+
+    const auto path =
+        std::filesystem::temp_directory_path() / "ryfmach_sound_compatibility.tsv";
+    {
+        std::ofstream output(path);
+        output << "# left_sound\tright_sound\treplace_cost\n";
+        output << "б\tп\t42\n";
+        output << "_а_\tп\t77\n";
+    }
+
+    const auto table = ryfmach::bel::LoadSoundCompatibilityTable(path);
+
+    ASSERT_TRUE(table.has_value());
+    EXPECT_DOUBLE_EQ(
+        ryfmach::bel::ReplaceCost(Sound{Phoneme::kB}, Sound{Phoneme::kP}, *table),
+        42.0);
+    EXPECT_DOUBLE_EQ(
+        ryfmach::bel::ReplaceCost(Sound{Phoneme::kP}, Sound{Phoneme::kB}, *table),
+        42.0);
+    EXPECT_DOUBLE_EQ(
+        ryfmach::bel::ReplaceCost(
+            Sound{Phoneme::kA, true}, Sound{Phoneme::kP}, *table),
+        77.0);
+    EXPECT_DOUBLE_EQ(
+        ryfmach::bel::ReplaceCost(Sound{Phoneme::kA}, Sound{Phoneme::kO}, *table),
+        1000.0);
 }
 
 } // namespace

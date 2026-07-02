@@ -15,3 +15,9 @@ target_include_directories(
     PUBLIC
     bel_lang_engine/include
 )
+
+target_compile_definitions(
+    bel_lang_engine
+    PRIVATE
+    RYFMACH_SOUND_COMPATIBILITY_PATH="${BEL_LANG_ENGINE_PATH}/data/sound_compatibility.tsv"
+)
