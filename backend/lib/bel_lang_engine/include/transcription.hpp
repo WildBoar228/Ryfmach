@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RYFMACH_BEL_LANG_ENGINE_INCLUDE_TRANSCRIPTION_HPP_
+#define RYFMACH_BEL_LANG_ENGINE_INCLUDE_TRANSCRIPTION_HPP_
 
 #include "sounds.hpp"
 
@@ -22,3 +23,5 @@ std::optional<std::size_t> GetAccentInTranscription(
     std::span<const Sound> transcription) noexcept;
 
 } // namespace ryfmach::bel
+
+#endif // RYFMACH_BEL_LANG_ENGINE_INCLUDE_TRANSCRIPTION_HPP_

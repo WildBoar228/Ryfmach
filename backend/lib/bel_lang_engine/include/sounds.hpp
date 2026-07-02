@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RYFMACH_BEL_LANG_ENGINE_INCLUDE_SOUNDS_HPP_
+#define RYFMACH_BEL_LANG_ENGINE_INCLUDE_SOUNDS_HPP_
 
 #include "language.hpp"
 
@@ -35,3 +36,5 @@ std::optional<Phoneme> WhistlingPair(Phoneme sound) noexcept;
 std::optional<Phoneme> HissingPair(Phoneme sound) noexcept;
 
 } // namespace ryfmach::bel
+
+#endif // RYFMACH_BEL_LANG_ENGINE_INCLUDE_SOUNDS_HPP_

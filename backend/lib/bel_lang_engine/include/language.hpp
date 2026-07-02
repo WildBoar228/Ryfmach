@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RYFMACH_BEL_LANG_ENGINE_INCLUDE_LANGUAGE_HPP_
+#define RYFMACH_BEL_LANG_ENGINE_INCLUDE_LANGUAGE_HPP_
 
 #include <cstddef>
 #include <cstdint>
@@ -119,3 +120,5 @@ bool IsDash(Letter letter) noexcept;
 std::optional<std::size_t> AlphabetOrder(Letter letter) noexcept;
 
 } // namespace ryfmach::bel
+
+#endif // RYFMACH_BEL_LANG_ENGINE_INCLUDE_LANGUAGE_HPP_

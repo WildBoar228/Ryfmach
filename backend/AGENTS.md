@@ -35,6 +35,7 @@ Use Google C++ style with these local adjustments:
 - Indent with 4 spaces.
 - Use `UpperCamelCase` for functions.
 - Use `kCamelCase` for enum values and constants.
+- Use traditional `#ifndef`/`#define` include guards instead of `#pragma once`.
 - Prefer `std::string_view` at text boundaries when ownership is not needed.
 - Keep public APIs small and domain-oriented.
 - Keep Belarusian language data as typed values internally; use UTF-8 strings at

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RYFMACH_BEL_LANG_ENGINE_INCLUDE_UTILS_HASH_HPP_
+#define RYFMACH_BEL_LANG_ENGINE_INCLUDE_UTILS_HASH_HPP_
 
 #include <array>
 #include <cstdint>
@@ -12,3 +13,5 @@ Sha1Digest Sha1(std::string_view input);
 std::uint64_t DigestModulo(const Sha1Digest& digest, std::uint64_t modulo) noexcept;
 
 } // namespace ryfmach::utils
+
+#endif // RYFMACH_BEL_LANG_ENGINE_INCLUDE_UTILS_HASH_HPP_

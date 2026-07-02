@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RYFMACH_BEL_LANG_ENGINE_INCLUDE_RHYMES_HPP_
+#define RYFMACH_BEL_LANG_ENGINE_INCLUDE_RHYMES_HPP_
 
 #include "sounds.hpp"
 
@@ -62,3 +63,5 @@ double ReplaceCost(
     const SoundCompatibilityTable& table) noexcept;
 
 } // namespace ryfmach::bel
+
+#endif // RYFMACH_BEL_LANG_ENGINE_INCLUDE_RHYMES_HPP_
