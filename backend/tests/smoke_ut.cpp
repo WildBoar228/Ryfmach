@@ -345,14 +345,14 @@ TEST(Rhymes, UsesDefaultSoundCompatibilityTable) {
     using ryfmach::bel::Sound;
 
     EXPECT_DOUBLE_EQ(
-        ryfmach::bel::ReplaceCost(Sound{Phoneme::kB}, Sound{Phoneme::kP}),
+        ryfmach::bel::SoundReplaceCost(Sound{Phoneme::kB}, Sound{Phoneme::kP}),
         3.5);
     EXPECT_DOUBLE_EQ(
-        ryfmach::bel::ReplaceCost(
+        ryfmach::bel::SoundReplaceCost(
             Sound{Phoneme::kA, true}, Sound{Phoneme::kP}),
         40.0);
     EXPECT_DOUBLE_EQ(
-        ryfmach::bel::ReplaceCost(std::optional<Sound>{}, std::optional<Sound>{}),
+        ryfmach::bel::SoundReplaceCost(std::optional<Sound>{}, std::optional<Sound>{}),
         0.0);
 }
 
@@ -373,18 +373,57 @@ TEST(Rhymes, LoadsSoundCompatibilityTableFromFile) {
 
     ASSERT_TRUE(table.has_value());
     EXPECT_DOUBLE_EQ(
-        ryfmach::bel::ReplaceCost(Sound{Phoneme::kB}, Sound{Phoneme::kP}, *table),
+        ryfmach::bel::SoundReplaceCost(Sound{Phoneme::kB}, Sound{Phoneme::kP}, *table),
         42.0);
     EXPECT_DOUBLE_EQ(
-        ryfmach::bel::ReplaceCost(Sound{Phoneme::kP}, Sound{Phoneme::kB}, *table),
+        ryfmach::bel::SoundReplaceCost(Sound{Phoneme::kP}, Sound{Phoneme::kB}, *table),
         42.0);
     EXPECT_DOUBLE_EQ(
-        ryfmach::bel::ReplaceCost(
+        ryfmach::bel::SoundReplaceCost(
             Sound{Phoneme::kA, true}, Sound{Phoneme::kP}, *table),
         77.0);
     EXPECT_DOUBLE_EQ(
-        ryfmach::bel::ReplaceCost(Sound{Phoneme::kA}, Sound{Phoneme::kO}, *table),
+        ryfmach::bel::SoundReplaceCost(Sound{Phoneme::kA}, Sound{Phoneme::kO}, *table),
         1000.0);
+}
+
+TEST(Rhymes, CalculatesKnownRhymeQualityKeys) {
+    struct TestCase {
+        std::string_view left_word;
+        std::size_t left_stress;
+        std::string_view right_word;
+        std::size_t right_stress;
+        double suffix_cost;
+        double prefix_cost;
+    };
+
+    const std::vector<TestCase> test_cases = {
+        {"неба", 1, "глеба", 2, 0.0, 5.0},
+        {"неба", 1, "хлеба", 2, 0.0, 5.0},
+        {"неба", 1, "трэба", 2, 0.0, 19.0},
+        {"неба", 1, "бясхлеб'і", 5, 1.0, 5.0},
+        {"неба", 1, "слепа", 2, 3.5, 5.0},
+        {"неба", 1, "свірэпа", 4, 3.5, 19.0},
+    };
+
+    for (const auto& test_case : test_cases) {
+        SCOPED_TRACE(test_case.left_word);
+        SCOPED_TRACE(test_case.right_word);
+
+        const auto left = ryfmach::bel::GetTranscriptionSounds(
+            test_case.left_word, test_case.left_stress);
+        const auto right = ryfmach::bel::GetTranscriptionSounds(
+            test_case.right_word, test_case.right_stress);
+
+        ASSERT_TRUE(left.has_value());
+        ASSERT_TRUE(right.has_value());
+
+        const auto [suffix_cost, prefix_cost] =
+            ryfmach::bel::CalcRhymeQualityKey(*left, *right, 2);
+
+        EXPECT_DOUBLE_EQ(suffix_cost, test_case.suffix_cost);
+        EXPECT_DOUBLE_EQ(prefix_cost, test_case.prefix_cost);
+    }
 }
 
 } // namespace

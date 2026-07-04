@@ -4,7 +4,10 @@
 #include "transcription.hpp"
 #include "utils/hash.hpp"
 
+#include <algorithm>
 #include <fstream>
+#include <ranges>
+#include <span>
 #include <sstream>
 #include <vector>
 
@@ -16,6 +19,8 @@ constexpr double kDefaultUnknownReplaceCost = 1000.0;
 constexpr std::size_t kPhonemeCount =
     static_cast<std::size_t>(Phoneme::kE) + 1;
 constexpr std::size_t kStressedVowelCount = 6;
+
+constexpr std::size_t kTranscriptionBufSize = 20;
 
 // Keys: empty, base phonemes in Phoneme enum order, then stressed vowels.
 static_assert(
@@ -370,28 +375,145 @@ std::optional<std::uint64_t> SoundHash(
     return utils::DigestModulo(utils::Sha1(*working_part), kSoundHashMod);
 }
 
-double ReplaceCost(Sound left, Sound right) noexcept {
-    return ReplaceCost(left, right, DefaultSoundCompatibilityTable());
+double SoundReplaceCost(Sound left, Sound right) noexcept {
+    return SoundReplaceCost(left, right, DefaultSoundCompatibilityTable());
 }
 
-double ReplaceCost(
+double SoundReplaceCost(
     Sound left,
     Sound right,
     const SoundCompatibilityTable& table) noexcept {
     return table.Cost(left, right);
 }
 
-double ReplaceCost(
+double SoundReplaceCost(
     std::optional<Sound> left,
     std::optional<Sound> right) noexcept {
-    return ReplaceCost(left, right, DefaultSoundCompatibilityTable());
+    return SoundReplaceCost(left, right, DefaultSoundCompatibilityTable());
 }
 
-double ReplaceCost(
+double SoundReplaceCost(
     std::optional<Sound> left,
     std::optional<Sound> right,
     const SoundCompatibilityTable& table) noexcept {
     return table.Cost(left, right);
+}
+
+namespace {
+
+template <typename T>
+concept Transcription = std::ranges::random_access_range<T> &&
+                        std::ranges::sized_range<T> &&
+                        std::convertible_to<std::ranges::range_reference_t<T>, const Sound&>;
+
+template <typename Seq1, typename Seq2>
+requires Transcription<Seq1> && Transcription<Seq2>
+void CalcRhymeScoreDp(
+    Seq1&& t1,
+    Seq2&& t2,
+    utils::MatrixSpan2d<double> dp,
+    utils::MatrixSpan2d<uint8_t> anc,
+    int max_shift
+) {
+    const int N = static_cast<int>(t1.size());
+    const int M = static_cast<int>(t2.size());
+    for (int i = 0; i <= N; ++i) {
+        for (int j = 0; j <= M; ++j) {
+            dp[i, j] = kDefaultUnknownReplaceCost;
+            anc[i, j] = 0;
+        }
+    }
+    dp[0, 0] = 0;
+
+    for (int i = 1; i <= N; ++i) {
+        const int lower = std::max(1, i - max_shift);
+        const int upper = std::min(M, i + max_shift);
+        for (int j = lower; j <= upper; ++j) {
+            if (i >= j - max_shift && dp[i - 1, j] < dp[i, j]) {
+                dp[i, j] = dp[i - 1, j];
+                anc[i, j] = 1;
+            }
+            if (j >= i - max_shift && dp[i, j - 1] < dp[i, j]) {
+                dp[i, j] = dp[i, j - 1];
+                anc[i, j] = 2;
+            }
+            if (dp[i - 1, j - 1] < dp[i, j]) {
+                dp[i, j] = dp[i - 1, j - 1];
+                anc[i, j] = 3;
+            }
+            dp[i, j] += SoundReplaceCost(t1[i - 1], t2[j - 1]);
+        }
+    }
+}
+
+double CalcPrefixCost(
+    int N, int M,
+    utils::MatrixSpan2d<double> dp_span,
+    int max_shift
+) {
+    double prefix_cost = 0;
+    for (int i = 1; i <= std::min(N, M); ++i) {
+        double minim = dp_span[i, i];
+        const int lower = std::max(1, i - max_shift);
+        const int upper = std::min(M, i + max_shift);
+        for (int j = lower; j <= upper; ++j) {
+            if (dp_span[i, j] < minim) {
+                minim = dp_span[i, j];
+            }
+        }
+        prefix_cost += minim - i;
+    }
+    return prefix_cost;
+}
+
+} // namespace
+
+std::pair<double, double> CalcRhymeQualityKey(
+    std::span<const Sound> t1,
+    std::span<const Sound> t2,
+    int max_shift
+) {
+    static double dp_buf[kTranscriptionBufSize][kTranscriptionBufSize];
+    static uint8_t anc_buf[kTranscriptionBufSize][kTranscriptionBufSize];
+    
+    const int N = static_cast<int>(t1.size());
+    const int M = static_cast<int>(t2.size());
+
+    std::vector<double> dp_arr;
+    std::vector<uint8_t> anc_arr;
+
+    utils::MatrixSpan2d<double> dp_span;
+    utils::MatrixSpan2d<uint8_t> anc_span;
+
+    if (N < kTranscriptionBufSize && M < kTranscriptionBufSize) {
+        dp_span = utils::MatrixSpan2d<double>(dp_buf, N + 1, M + 1);
+        anc_span = utils::MatrixSpan2d<uint8_t>(anc_buf, N + 1, M + 1);
+    } else {
+        dp_arr.resize((N + 1) * (M + 1));
+        anc_arr.resize((N + 1) * (M + 1));
+        dp_span = utils::MatrixSpan2d<double>(dp_arr, N + 1, M + 1, M + 1);
+        anc_span = utils::MatrixSpan2d<uint8_t>(anc_arr, N + 1, M + 1, M + 1);
+    }
+
+    auto accent1 = GetAccentInTranscription(t1);
+    auto accent2 = GetAccentInTranscription(t2);
+    std::size_t cut_index1 = accent1.has_value() ? *accent1 : 0;
+    std::size_t cut_index2 = accent2.has_value() ? *accent2 : 0;
+
+    auto suffix1 = t1.subspan(cut_index1);
+    auto suffix2 = t2.subspan(cut_index2);
+    CalcRhymeScoreDp(suffix1, suffix2, dp_span, anc_span, max_shift);
+    double suffix_cost = dp_span[suffix1.size(), suffix2.size()];
+
+    auto prefix1 = t1.subspan(0, cut_index1) | std::views::reverse;
+    auto prefix2 = t2.subspan(0, cut_index2) | std::views::reverse;
+    CalcRhymeScoreDp(prefix1, prefix2, dp_span, anc_span, max_shift);
+
+    double prefix_cost = CalcPrefixCost(
+        static_cast<int>(prefix1.size()),
+        static_cast<int>(prefix2.size()),
+        dp_span, max_shift);
+    return {suffix_cost, prefix_cost};
 }
 
 } // namespace ryfmach::bel

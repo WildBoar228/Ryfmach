@@ -2,6 +2,7 @@
 #define RYFMACH_BEL_LANG_ENGINE_INCLUDE_RHYMES_HPP_
 
 #include "sounds.hpp"
+#include "utils/matrix_span.hpp"
 
 #include <array>
 #include <cstddef>
@@ -49,18 +50,23 @@ std::optional<SoundCompatibilityTable> LoadSoundCompatibilityTable(
 
 const SoundCompatibilityTable& DefaultSoundCompatibilityTable() noexcept;
 
-double ReplaceCost(Sound left, Sound right) noexcept;
-double ReplaceCost(
+double SoundReplaceCost(Sound left, Sound right) noexcept;
+double SoundReplaceCost(
     Sound left,
     Sound right,
     const SoundCompatibilityTable& table) noexcept;
-double ReplaceCost(
+double SoundReplaceCost(
     std::optional<Sound> left,
     std::optional<Sound> right) noexcept;
-double ReplaceCost(
+double SoundReplaceCost(
     std::optional<Sound> left,
     std::optional<Sound> right,
     const SoundCompatibilityTable& table) noexcept;
+
+std::pair<double, double> CalcRhymeQualityKey(
+    std::span<const Sound> t1,
+    std::span<const Sound> t2,
+    int max_shift);
 
 } // namespace ryfmach::bel
 
