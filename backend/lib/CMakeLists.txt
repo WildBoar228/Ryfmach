@@ -21,3 +21,5 @@ target_compile_definitions(
     PRIVATE
     RYFMACH_SOUND_COMPATIBILITY_PATH="${BEL_LANG_ENGINE_PATH}/data/sound_compatibility.tsv"
 )
+
+target_compile_options(bel_lang_engine PRIVATE "-O3")

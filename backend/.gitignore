@@ -1,2 +1,8 @@
 build/
+data/
+
+.agents/
+.codex/
 .vscode/
+
+.env

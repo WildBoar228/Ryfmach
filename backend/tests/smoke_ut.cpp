@@ -13,8 +13,7 @@
 
 namespace {
 
-std::string JoinTranscription(
-    const std::vector<ryfmach::bel::Sound>& transcription) {
+std::string JoinTranscription(std::span<const ryfmach::bel::Sound> transcription) {
     std::string result;
     for (std::size_t index = 0; index < transcription.size(); ++index) {
         if (index != 0) {

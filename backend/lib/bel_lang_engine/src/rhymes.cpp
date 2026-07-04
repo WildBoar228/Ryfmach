@@ -473,11 +473,12 @@ std::pair<double, double> CalcRhymeQualityKey(
     std::span<const Sound> t2,
     int max_shift
 ) {
-    static double dp_buf[kTranscriptionBufSize][kTranscriptionBufSize];
-    static uint8_t anc_buf[kTranscriptionBufSize][kTranscriptionBufSize];
+    thread_local double dp_buf[kTranscriptionBufSize][kTranscriptionBufSize];
+    thread_local uint8_t anc_buf[kTranscriptionBufSize][kTranscriptionBufSize];
     
     const int N = static_cast<int>(t1.size());
     const int M = static_cast<int>(t2.size());
+    max_shift = std::max(max_shift, std::abs(N - M));
 
     std::vector<double> dp_arr;
     std::vector<uint8_t> anc_arr;
