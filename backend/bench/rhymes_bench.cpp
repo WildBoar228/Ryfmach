@@ -1,4 +1,5 @@
 #include "rhymes.hpp"
+#include "slounik.hpp"
 #include "transcription.hpp"
 
 #include <benchmark/benchmark.h>
@@ -173,5 +174,39 @@ void BM_RhymeQuality(benchmark::State& state) {
         static_cast<double>(rhyme_pairs_processed), benchmark::Counter::kIsRate);
 }
 BENCHMARK(BM_RhymeQuality)->Unit(benchmark::kMicrosecond);
+
+void BM_FindWordsInSlounik(benchmark::State& state) {
+    const std::vector<WordEntry>* words = nullptr;
+    try {
+        words = &WordsDataset();
+    } catch (const std::exception& error) {
+        state.SkipWithError(error.what());
+        return;
+    }
+    if (words->empty()) {
+        state.SkipWithError("Words dataset is empty");
+    }
+
+    ryfmach::bel::Slounik slounik;
+    const ryfmach::bel::WordLookupOptions opt{
+        .fix_similar_letters = true,
+        .include_compound_tail = true,
+        .max_similar_letter_replacements = 5
+    };
+    
+    std::size_t word_index = 0;
+    for (auto _ : state) {
+        const auto& word = (*words)[word_index];
+        word_index = (word_index + 1) % words->size();
+
+        auto found = slounik.FindWords(word.word, opt);
+        if (found.empty()) {
+            state.SkipWithError("Word not found: " + word.word);
+        }
+    }
+    
+    state.SetItemsProcessed(static_cast<uint64_t>(state.iterations()));
+}
+BENCHMARK(BM_FindWordsInSlounik)->Unit(benchmark::kMicrosecond);
 
 } // namespace
