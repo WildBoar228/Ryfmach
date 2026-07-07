@@ -1,7 +1,10 @@
 #include "language.hpp"
 #include "rhymes.hpp"
+#include "slounik.hpp"
 #include "sounds.hpp"
 #include "transcription.hpp"
+
+#include <SQLiteCpp/SQLiteCpp.h>
 
 #include <gtest/gtest.h>
 
@@ -22,6 +25,41 @@ std::string JoinTranscription(std::span<const ryfmach::bel::Sound> transcription
         result += ryfmach::bel::SoundSpelling(transcription[index]);
     }
     return result;
+}
+
+std::filesystem::path CreateSlounikTestDatabase() {
+    const auto path =
+        std::filesystem::temp_directory_path() / "ryfmach_slounik_test.sqlite";
+
+    SQLite::Database db(path, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
+    db.exec("DROP TABLE IF EXISTS words");
+    db.exec("DROP TABLE IF EXISTS parts_of_speech");
+    db.exec(R"sql(
+        CREATE TABLE parts_of_speech (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL
+        )
+    )sql");
+    db.exec(R"sql(
+        CREATE TABLE words (
+            id INTEGER PRIMARY KEY,
+            word TEXT NOT NULL,
+            initial_id INTEGER NOT NULL,
+            part_of_speech INTEGER NOT NULL,
+            accent_index INTEGER NOT NULL,
+            sound_hash0 INTEGER,
+            sound_hash1 INTEGER,
+            sound_hash2 INTEGER,
+            sound_hash3 INTEGER
+        )
+    )sql");
+    db.exec("INSERT INTO parts_of_speech (id, name) VALUES (1, 'назоўнік')");
+    db.exec("INSERT INTO words VALUES (1, 'хата', 1, 1, 1, 0, 0, 0, 0)");
+    db.exec("INSERT INTO words VALUES (2, 'хаце', 1, 1, 1, 0, 0, 0, 0)");
+    db.exec("INSERT INTO words VALUES (3, 'верас', 3, 1, 1, 0, 0, 0, 0)");
+    db.exec("INSERT INTO words VALUES (4, 'дзень', 4, 1, 2, 0, 0, 0, 0)");
+
+    return path;
 }
 
 TEST(Language, ParsesBelarusianWord) {
@@ -423,6 +461,89 @@ TEST(Rhymes, CalculatesKnownRhymeQualityKeys) {
         EXPECT_DOUBLE_EQ(suffix_cost, test_case.suffix_cost);
         EXPECT_DOUBLE_EQ(prefix_cost, test_case.prefix_cost);
     }
+}
+
+TEST(Slounik, FindsExactWords) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+
+    const auto words = slounik.FindWords("хаце");
+
+    ASSERT_EQ(words.size(), 1);
+    EXPECT_EQ(words[0].id, 2);
+    EXPECT_EQ(words[0].word, "хаце");
+    EXPECT_EQ(words[0].part_of_speech_id, 1);
+    EXPECT_EQ(words[0].part_of_speech, "назоўнік");
+    EXPECT_EQ(words[0].accent, 1);
+    EXPECT_FALSE(words[0].is_initial);
+    EXPECT_EQ(words[0].initial_id, 1);
+    ASSERT_TRUE(words[0].initial_word.has_value());
+    EXPECT_EQ(*words[0].initial_word, "хата");
+    ASSERT_TRUE(words[0].initial_accent.has_value());
+    EXPECT_EQ(*words[0].initial_accent, 1);
+}
+
+TEST(Slounik, FindsSimilarLetterVariants) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+
+    const auto words = slounik.FindWords(
+        "вёрас", ryfmach::bel::WordLookupOptions{.fix_similar_letters = true});
+
+    ASSERT_EQ(words.size(), 1);
+    EXPECT_EQ(words[0].word, "верас");
+}
+
+TEST(Slounik, LimitsSimilarLetterVariants) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+
+    const auto words = slounik.FindWords(
+        "вёрас",
+        ryfmach::bel::WordLookupOptions{
+            .fix_similar_letters = true,
+            .max_similar_letter_replacements = 0,
+        });
+
+    EXPECT_TRUE(words.empty());
+}
+
+TEST(Slounik, FindsCompoundTailWords) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+
+    const auto words = slounik.FindWords("што-дзень");
+
+    ASSERT_EQ(words.size(), 1);
+    EXPECT_EQ(words[0].word, "што-дзень");
+    EXPECT_EQ(words[0].accent, 6);
+}
+
+TEST(Slounik, GetsWordById) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+
+    const auto word = slounik.GetWordById(1);
+
+    ASSERT_TRUE(word.has_value());
+    EXPECT_EQ(word->id, 1);
+    EXPECT_EQ(word->word, "хата");
+    EXPECT_TRUE(word->is_initial);
+    EXPECT_EQ(word->initial_id, 1);
+    EXPECT_FALSE(word->initial_word.has_value());
+    EXPECT_FALSE(word->initial_accent.has_value());
+}
+
+TEST(Slounik, ReturnsNulloptForMissingWordId) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+
+    EXPECT_FALSE(slounik.GetWordById(404).has_value());
+}
+
+TEST(Slounik, GetsWordForms) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+
+    const auto words = slounik.GetWordForms(1);
+
+    ASSERT_EQ(words.size(), 2);
+    EXPECT_EQ(words[0].word, "хата");
+    EXPECT_EQ(words[1].word, "хаце");
+    EXPECT_EQ(words[1].initial_word, "хата");
 }
 
 } // namespace
