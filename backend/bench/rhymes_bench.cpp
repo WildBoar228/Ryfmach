@@ -160,7 +160,7 @@ void BM_RhymeQuality(benchmark::State& state) {
         query_index = (query_index + 1) % queries->size();
 
         for (const auto& rhyme_transcription : query.rhyme_transcriptions) {
-            auto quality = ryfmach::bel::CalcRhymeQualityKey(
+            auto quality = ryfmach::bel::CalcRhymeCost(
                 query.query_transcription, rhyme_transcription, 5);
             benchmark::DoNotOptimize(quality);
         }

@@ -1,6 +1,8 @@
 #ifndef RYFMACH_BEL_LANG_ENGINE_INCLUDE_SLOUNIK_HPP_
 #define RYFMACH_BEL_LANG_ENGINE_INCLUDE_SLOUNIK_HPP_
 
+#include "rhyme_ranking.hpp"
+
 #include <cstddef>
 #include <filesystem>
 #include <memory>
@@ -10,6 +12,8 @@
 #include <vector>
 
 namespace ryfmach::bel {
+
+struct Rhyme;
 
 struct WordRecord {
     int id = 0;
@@ -29,6 +33,18 @@ struct WordLookupOptions {
     std::size_t max_similar_letter_replacements = 5;
 };
 
+enum class SearchMistakeLevel {
+    kAdaptive,
+    kIdeal,
+    kGood,
+    kMedium,
+    kWeak
+};
+
+struct RhymeSearchFilters {
+    // TODO
+};
+
 class Slounik {
 public:
     Slounik();
@@ -45,6 +61,13 @@ public:
         WordLookupOptions options = {}) const;
     std::optional<WordRecord> GetWordById(int id) const;
     std::vector<WordRecord> GetWordForms(int initial_id) const;
+
+    std::vector<Rhyme> FindRhymes(
+        const WordRecord& input_word,
+        SearchMistakeLevel,
+        RhymeSearchFilters,
+        std::size_t max_cnt
+    ) const;
 
 private:
     class Impl;

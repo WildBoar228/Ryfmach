@@ -1,8 +1,10 @@
+#include "rhymes.hpp"
 #include "slounik.hpp"
 
 #include <SQLiteCpp/SQLiteCpp.h>
 
 #include <cstdlib>
+#include <limits>
 #include <mutex>
 #include <stdexcept>
 #include <unordered_set>
@@ -246,6 +248,52 @@ public:
         return words;
     }
 
+    std::vector<Rhyme> FindRhymesAdaptive(
+        const WordRecord& input_word,
+        const RhymeSearchFilters& filters,
+        std::size_t min_adaptive_cnt,
+        std::size_t max_cnt
+    ) const {
+        std::vector<Rhyme> rhymes;
+        for (auto iter_mistake : {RhymeMistakeLevel::kIdeal,
+                                  RhymeMistakeLevel::kGood,
+                                  RhymeMistakeLevel::kMedium,
+                                  RhymeMistakeLevel::kWeak}) {
+            std::vector<WordRecord> new_candidates = FilteredSearchBySoundHash(
+                input_word,
+                iter_mistake,
+                filters, max_cnt);
+            
+            std::vector<Rhyme> new_rhymes = WordsToRhymesWithScore(
+                input_word,
+                std::move(new_candidates));
+            
+            rhymes.insert(
+                rhymes.end(),
+                std::make_move_iterator(new_rhymes.begin()),
+                std::make_move_iterator(new_rhymes.end()));
+
+            if (rhymes.size() >= min_adaptive_cnt) {
+                break;
+            }
+        }
+        return rhymes;
+    }
+
+    std::vector<Rhyme> FindRhymes(
+        const WordRecord& input_word,
+        RhymeMistakeLevel mistake,
+        const RhymeSearchFilters& filters,
+        std::size_t max_cnt
+    ) const {
+        std::vector<WordRecord> candidates = FilteredSearchBySoundHash(
+            input_word, mistake, filters, max_cnt);
+        std::vector<Rhyme> rhymes = WordsToRhymesWithScore(
+            input_word,
+            std::move(candidates));
+        return rhymes;
+    }
+
 private:
     std::string WordRecordSelectSql() const {
         return R"sql(
@@ -322,6 +370,77 @@ private:
         return word;
     }
 
+    std::size_t FilterRhymesByInitial(
+        std::span<Rhyme> rhymes,
+        std::unordered_set<std::uint64_t>& initial_ids
+    ) const {
+        std::size_t k = 0;
+        for (std::size_t i = 0; i < rhymes.size(); ++i) {
+            Rhyme& rhyme = rhymes[i];
+            if (!initial_ids.contains(rhyme.initial_id)) {
+                initial_ids.insert(rhyme.initial_id);
+                rhymes[k] = std::move(rhyme);
+                ++k;
+            }
+        }
+        return k;
+    }
+
+    std::vector<WordRecord> FilteredSearchBySoundHash(
+        const WordRecord& input_word,
+        RhymeMistakeLevel mistake,
+        const RhymeSearchFilters& filters,
+        std::size_t max_cnt
+    ) const {
+        std::lock_guard lock(mutex_);
+
+        SQLite::Statement query(
+            db_,
+            WordRecordSelectSql() +
+            "WHERE w.id != ? AND " +
+            BuildSoundHashFilter(mistake) + 
+            R"sql(
+                ORDER BY w.word, w.initial_id, w.accent_index
+                LIMIT ?;
+            )sql");
+
+        int placehold_index = 1;
+        query.bind(placehold_index++, input_word.id);
+        for (auto iter_mistake : {RhymeMistakeLevel::kIdeal,
+                                  RhymeMistakeLevel::kGood,
+                                  RhymeMistakeLevel::kMedium,
+                                  RhymeMistakeLevel::kWeak}) {
+            auto sound_hash = SoundHash(input_word.word, input_word.accent, iter_mistake);
+            if (!sound_hash) { throw std::runtime_error("Can't calculate sound hash"); }
+            query.bind(placehold_index++, static_cast<int64_t>(*sound_hash));
+            if (iter_mistake == mistake) { break; }
+        }
+        query.bind(placehold_index++, static_cast<int64_t>(max_cnt));
+
+        std::vector<WordRecord> words;
+        while (query.executeStep()) {
+            WordRecord rec = WordFromRow(query);
+            words.push_back(std::move(rec));
+        }
+        return words;
+    }
+
+    std::string BuildSoundHashFilter(RhymeMistakeLevel mistake) const {
+        switch (mistake) {
+            case RhymeMistakeLevel::kIdeal:
+                return "w.sound_hash0 == ?";
+            case RhymeMistakeLevel::kGood:
+                return "w.sound_hash0 != ? AND w.sound_hash1 == ?";
+            case RhymeMistakeLevel::kMedium:
+                return R"(w.sound_hash0 != ? AND w.sound_hash1 != ? AND
+                        w.sound_hash2 == ?)";
+            case RhymeMistakeLevel::kWeak:
+                return R"(w.sound_hash0 != ? AND w.sound_hash1 != ? AND
+                        w.sound_hash2 != ? AND w.sound_hash3 == ?)";
+        }
+        return "";
+    }
+
     SQLite::Database db_;
     mutable std::mutex mutex_;
 };
@@ -349,6 +468,41 @@ std::optional<WordRecord> Slounik::GetWordById(int id) const {
 
 std::vector<WordRecord> Slounik::GetWordForms(int initial_id) const {
     return impl_->GetWordForms(initial_id);
+}
+
+std::vector<Rhyme> Slounik::FindRhymes(
+    const WordRecord& input_word,
+    SearchMistakeLevel mistake,
+    RhymeSearchFilters filters,
+    std::size_t max_cnt
+) const {
+    RhymeMistakeLevel rhyme_mistake;
+    switch (mistake) {
+        case SearchMistakeLevel::kAdaptive:
+            return impl_->FindRhymesAdaptive(
+                input_word,
+                filters,
+                std::numeric_limits<std::size_t>::max(),
+                max_cnt);
+
+        case SearchMistakeLevel::kIdeal:
+            rhyme_mistake = RhymeMistakeLevel::kIdeal; break;
+
+        case SearchMistakeLevel::kGood:
+            rhyme_mistake = RhymeMistakeLevel::kGood; break;
+
+        case SearchMistakeLevel::kMedium:
+            rhyme_mistake = RhymeMistakeLevel::kMedium; break;
+
+        case SearchMistakeLevel::kWeak:
+            rhyme_mistake = RhymeMistakeLevel::kWeak; break;
+    }
+
+    return impl_->FindRhymes(
+        input_word,
+        rhyme_mistake,
+        filters,
+        max_cnt);
 }
 
 } // namespace ryfmach::bel

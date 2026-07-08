@@ -14,7 +14,7 @@
 namespace ryfmach::bel {
 namespace {
 
-constexpr std::uint64_t kSoundHashMod = 12345678901234277ULL;
+constexpr std::uint64_t kSoundHashMod = 12345678901234277ULL; // Should fit into int64_t
 constexpr double kDefaultUnknownReplaceCost = 1000.0;
 constexpr std::size_t kPhonemeCount =
     static_cast<std::size_t>(Phoneme::kE) + 1;
@@ -120,14 +120,15 @@ void RemoveSoundDuplicates(std::vector<Sound>& sounds) {
     }
 }
 
-std::vector<Sound> CutFromStress(std::vector<Sound> sounds, int mistake) {
+std::vector<Sound> CutFromStress(std::vector<Sound> sounds, RhymeMistakeLevel mistake) {
     const auto stress = FindStress(sounds);
     if (!stress) {
         return sounds;
     }
 
     const std::size_t start =
-        *stress == sounds.size() - 1 && sounds.size() > 1 && mistake < 2
+        *stress == sounds.size() - 1 && sounds.size() > 1 &&
+        (mistake == RhymeMistakeLevel::kIdeal || mistake == RhymeMistakeLevel::kGood)
             ? *stress - 1
             : *stress;
 
@@ -331,14 +332,10 @@ const SoundCompatibilityTable& DefaultSoundCompatibilityTable() noexcept {
     return table;
 }
 
-std::optional<std::string> WorkingPart(
+std::optional<std::string> CalcWorkingPart(
     std::string_view word,
     std::size_t stress,
-    int mistake) {
-    if (mistake < 0) {
-        mistake = 0;
-    }
-
+    RhymeMistakeLevel mistake) {
     auto sounds = GetTranscriptionSounds(word, stress);
     if (!sounds) {
         return std::nullopt;
@@ -346,18 +343,17 @@ std::optional<std::string> WorkingPart(
 
     RemoveSoundDuplicates(*sounds);
     auto working = CutFromStress(*sounds, mistake);
-    if (working.empty()) {
-        return std::nullopt;
-    }
 
-    if (mistake >= 1) {
+    for (;;) {
+        if (mistake == RhymeMistakeLevel::kIdeal) { break; }
         ApplyGoodRhyme(working);
-    }
-    if (mistake >= 2) {
+
+        if (mistake == RhymeMistakeLevel::kGood) { break; }
         ApplyMediumRhyme(working);
-    }
-    if (mistake >= 3) {
+
+        if (mistake == RhymeMistakeLevel::kMedium) { break; }
         ApplyWeakRhyme(working);
+        break;
     }
 
     return JoinSounds(working);
@@ -366,8 +362,8 @@ std::optional<std::string> WorkingPart(
 std::optional<std::uint64_t> SoundHash(
     std::string_view word,
     std::size_t stress,
-    int mistake) {
-    const auto working_part = WorkingPart(word, stress, mistake);
+    RhymeMistakeLevel mistake) {
+    const auto working_part = CalcWorkingPart(word, stress, mistake);
     if (!working_part) {
         return std::nullopt;
     }
@@ -408,7 +404,7 @@ concept Transcription = std::ranges::random_access_range<T> &&
 
 template <typename Seq1, typename Seq2>
 requires Transcription<Seq1> && Transcription<Seq2>
-void CalcRhymeScoreDp(
+void CalcRhymeCostDp(
     Seq1&& t1,
     Seq2&& t2,
     utils::MatrixSpan2d<double> dp,
@@ -466,9 +462,18 @@ double CalcPrefixCost(
     return prefix_cost;
 }
 
+struct Rhyme {
+    std::string_view word;
+    std::size_t stress;
+    double score;
+    double penalty;
+};
+
+
+
 } // namespace
 
-std::pair<double, double> CalcRhymeQualityKey(
+RhymeCostType CalcRhymeCost(
     std::span<const Sound> t1,
     std::span<const Sound> t2,
     int max_shift
@@ -503,12 +508,12 @@ std::pair<double, double> CalcRhymeQualityKey(
 
     auto suffix1 = t1.subspan(cut_index1);
     auto suffix2 = t2.subspan(cut_index2);
-    CalcRhymeScoreDp(suffix1, suffix2, dp_span, anc_span, max_shift);
+    CalcRhymeCostDp(suffix1, suffix2, dp_span, anc_span, max_shift);
     double suffix_cost = dp_span[suffix1.size(), suffix2.size()];
 
     auto prefix1 = t1.subspan(0, cut_index1) | std::views::reverse;
     auto prefix2 = t2.subspan(0, cut_index2) | std::views::reverse;
-    CalcRhymeScoreDp(prefix1, prefix2, dp_span, anc_span, max_shift);
+    CalcRhymeCostDp(prefix1, prefix2, dp_span, anc_span, max_shift);
 
     double prefix_cost = CalcPrefixCost(
         static_cast<int>(prefix1.size()),

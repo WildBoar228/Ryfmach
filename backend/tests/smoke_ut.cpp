@@ -8,6 +8,8 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -25,6 +27,58 @@ std::string JoinTranscription(std::span<const ryfmach::bel::Sound> transcription
         result += ryfmach::bel::SoundSpelling(transcription[index]);
     }
     return result;
+}
+
+std::array<std::uint64_t, 4> SoundHashesFor(
+    std::string_view word,
+    std::size_t stress) {
+    return {
+        *ryfmach::bel::SoundHash(
+            word, stress, ryfmach::bel::RhymeMistakeLevel::kIdeal),
+        *ryfmach::bel::SoundHash(
+            word, stress, ryfmach::bel::RhymeMistakeLevel::kGood),
+        *ryfmach::bel::SoundHash(
+            word, stress, ryfmach::bel::RhymeMistakeLevel::kMedium),
+        *ryfmach::bel::SoundHash(
+            word, stress, ryfmach::bel::RhymeMistakeLevel::kWeak),
+    };
+}
+
+void InsertWord(
+    SQLite::Database& db,
+    int id,
+    std::string_view word,
+    int initial_id,
+    int part_of_speech,
+    std::size_t accent,
+    std::array<std::uint64_t, 4> sound_hashes) {
+    SQLite::Statement insert(
+        db,
+        R"sql(
+            INSERT INTO words
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        )sql");
+
+    insert.bind(1, id);
+    insert.bind(2, std::string(word));
+    insert.bind(3, initial_id);
+    insert.bind(4, part_of_speech);
+    insert.bind(5, static_cast<std::int64_t>(accent));
+    for (std::size_t index = 0; index < sound_hashes.size(); ++index) {
+        insert.bind(
+            static_cast<int>(index + 6),
+            static_cast<std::int64_t>(sound_hashes[index]));
+    }
+    insert.exec();
+}
+
+std::vector<int> RhymeWordIds(std::span<const ryfmach::bel::Rhyme> rhymes) {
+    std::vector<int> ids;
+    ids.reserve(rhymes.size());
+    for (const auto& rhyme : rhymes) {
+        ids.push_back(rhyme.word_id);
+    }
+    return ids;
 }
 
 std::filesystem::path CreateSlounikTestDatabase() {
@@ -54,10 +108,25 @@ std::filesystem::path CreateSlounikTestDatabase() {
         )
     )sql");
     db.exec("INSERT INTO parts_of_speech (id, name) VALUES (1, 'назоўнік')");
-    db.exec("INSERT INTO words VALUES (1, 'хата', 1, 1, 1, 0, 0, 0, 0)");
-    db.exec("INSERT INTO words VALUES (2, 'хаце', 1, 1, 1, 0, 0, 0, 0)");
-    db.exec("INSERT INTO words VALUES (3, 'верас', 3, 1, 1, 0, 0, 0, 0)");
-    db.exec("INSERT INTO words VALUES (4, 'дзень', 4, 1, 2, 0, 0, 0, 0)");
+
+    const auto khata_hashes = SoundHashesFor("хата", 1);
+    InsertWord(db, 1, "хата", 1, 1, 1, khata_hashes);
+    InsertWord(db, 2, "хаце", 1, 1, 1, SoundHashesFor("хаце", 1));
+    InsertWord(db, 3, "верас", 3, 1, 1, SoundHashesFor("верас", 1));
+    InsertWord(db, 4, "дзень", 4, 1, 2, SoundHashesFor("дзень", 2));
+
+    InsertWord(
+        db, 5, "рата", 5, 1, 1,
+        {khata_hashes[0], 100001, 100002, 100003});
+    InsertWord(
+        db, 6, "хаты", 6, 1, 1,
+        {100010, khata_hashes[1], 100012, 100013});
+    InsertWord(
+        db, 7, "мата", 7, 1, 1,
+        {100020, 100021, khata_hashes[2], 100023});
+    InsertWord(
+        db, 8, "дата", 8, 1, 1,
+        {100030, 100031, 100032, khata_hashes[3]});
 
     return path;
 }
@@ -233,21 +302,21 @@ TEST(Transcription, MatchesKnownWords) {
 }
 
 TEST(Rhymes, BuildsWorkingPartForMistakeLevels) {
-    EXPECT_EQ(ryfmach::bel::WorkingPart("хата", 1, 0), "_а_та");
-    EXPECT_EQ(ryfmach::bel::WorkingPart("хата", 1, 1), "_а_ты");
-    EXPECT_EQ(ryfmach::bel::WorkingPart("хата", 1, 2), "_а_ты");
-    EXPECT_EQ(ryfmach::bel::WorkingPart("хата", 1, 3), "_а_фы");
+    EXPECT_EQ(ryfmach::bel::CalcWorkingPart("хата", 1, ryfmach::bel::RhymeMistakeLevel::kIdeal), "_а_та");
+    EXPECT_EQ(ryfmach::bel::CalcWorkingPart("хата", 1, ryfmach::bel::RhymeMistakeLevel::kGood), "_а_ты");
+    EXPECT_EQ(ryfmach::bel::CalcWorkingPart("хата", 1, ryfmach::bel::RhymeMistakeLevel::kMedium), "_а_ты");
+    EXPECT_EQ(ryfmach::bel::CalcWorkingPart("хата", 1, ryfmach::bel::RhymeMistakeLevel::kWeak), "_а_фы");
 }
 
 TEST(Rhymes, KeepsPreviousSoundForFinalStressInStrictRhymes) {
-    EXPECT_EQ(ryfmach::bel::WorkingPart("дзень", 2, 0), "_э_н'");
-    EXPECT_EQ(ryfmach::bel::WorkingPart("дзень", 2, 1), "_э_н");
-    EXPECT_EQ(ryfmach::bel::WorkingPart("дзень", 2, 2), "_э_н");
+    EXPECT_EQ(ryfmach::bel::CalcWorkingPart("дзень", 2, ryfmach::bel::RhymeMistakeLevel::kIdeal), "_э_н'");
+    EXPECT_EQ(ryfmach::bel::CalcWorkingPart("дзень", 2, ryfmach::bel::RhymeMistakeLevel::kGood), "_э_н");
+    EXPECT_EQ(ryfmach::bel::CalcWorkingPart("дзень", 2, ryfmach::bel::RhymeMistakeLevel::kMedium), "_э_н");
 }
 
 TEST(Rhymes, MatchesKnownWorkingPartsAndHashes) {
     struct MistakeCase {
-        int mistake;
+        ryfmach::bel::RhymeMistakeLevel mistake;
         std::string_view working_part;
         std::uint64_t hash;
     };
@@ -263,100 +332,100 @@ TEST(Rhymes, MatchesKnownWorkingPartsAndHashes) {
             "хата",
             1,
             {
-                {0, "_а_та", 445859199653511ULL},
-                {1, "_а_ты", 1226555324871529ULL},
-                {2, "_а_ты", 1226555324871529ULL},
-                {3, "_а_фы", 6004182820957543ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kIdeal, "_а_та", 445859199653511ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kGood, "_а_ты", 1226555324871529ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kMedium, "_а_ты", 1226555324871529ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kWeak, "_а_фы", 6004182820957543ULL},
             },
         },
         {
             "неба",
             1,
             {
-                {0, "_э_ба", 11088797979124984ULL},
-                {1, "_э_пы", 3485216863999811ULL},
-                {2, "_э_пы", 3485216863999811ULL},
-                {3, "_э_фы", 11105704373828186ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kIdeal, "_э_ба", 11088797979124984ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kGood, "_э_пы", 3485216863999811ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kMedium, "_э_пы", 3485216863999811ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kWeak, "_э_фы", 11105704373828186ULL},
             },
         },
         {
             "дзень",
             2,
             {
-                {0, "_э_н'", 10109537621506963ULL},
-                {1, "_э_н", 6803580395416928ULL},
-                {2, "_э_н", 6803580395416928ULL},
-                {3, "_э_л", 5555379031036954ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kIdeal, "_э_н'", 10109537621506963ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kGood, "_э_н", 6803580395416928ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kMedium, "_э_н", 6803580395416928ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kWeak, "_э_л", 5555379031036954ULL},
             },
         },
         {
             "ксёндз",
             2,
             {
-                {0, "_о_нц", 1737930885662061ULL},
-                {1, "_о_нц", 1737930885662061ULL},
-                {2, "_о_лц", 8508750108388868ULL},
-                {3, "_о_с", 6525980150844431ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kIdeal, "_о_нц", 1737930885662061ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kGood, "_о_нц", 1737930885662061ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kMedium, "_о_лц", 8508750108388868ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kWeak, "_о_с", 6525980150844431ULL},
             },
         },
         {
             "шчаўе",
             2,
             {
-                {0, "_а_ўйэ", 1160418455848226ULL},
-                {1, "_а_ўйы", 8679091878039836ULL},
-                {2, "_а_ы", 968517201168586ULL},
-                {3, "_а_ы", 968517201168586ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kIdeal, "_а_ўйэ", 1160418455848226ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kGood, "_а_ўйы", 8679091878039836ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kMedium, "_а_ы", 968517201168586ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kWeak, "_а_ы", 968517201168586ULL},
             },
         },
         {
             "лодка",
             1,
             {
-                {0, "_о_тка", 577013656646148ULL},
-                {1, "_о_ткы", 11205430430294211ULL},
-                {2, "_о_ткы", 11205430430294211ULL},
-                {3, "_о_фы", 9835650543388685ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kIdeal, "_о_тка", 577013656646148ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kGood, "_о_ткы", 11205430430294211ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kMedium, "_о_ткы", 11205430430294211ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kWeak, "_о_фы", 9835650543388685ULL},
             },
         },
         {
             "кніжка",
             2,
             {
-                {0, "_і_шка", 671887678995401ULL},
-                {1, "_і_шкы", 6167163906441582ULL},
-                {2, "_і_шкы", 6167163906441582ULL},
-                {3, "_і_фы", 7341684740097667ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kIdeal, "_і_шка", 671887678995401ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kGood, "_і_шкы", 6167163906441582ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kMedium, "_і_шкы", 6167163906441582ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kWeak, "_і_фы", 7341684740097667ULL},
             },
         },
         {
             "касьба",
             5,
             {
-                {0, "б_а_", 8508740673753778ULL},
-                {1, "б_а_", 8508740673753778ULL},
-                {2, "_а_", 9525167144504378ULL},
-                {3, "_а_", 9525167144504378ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kIdeal, "б_а_", 8508740673753778ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kGood, "б_а_", 8508740673753778ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kMedium, "_а_", 9525167144504378ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kWeak, "_а_", 9525167144504378ULL},
             },
         },
         {
             "лічба",
             1,
             {
-                {0, "_і_джба", 8478135653608230ULL},
-                {1, "_і_чпы", 939249229248069ULL},
-                {2, "_і_шпы", 11402240861085748ULL},
-                {3, "_і_фы", 7341684740097667ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kIdeal, "_і_джба", 8478135653608230ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kGood, "_і_чпы", 939249229248069ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kMedium, "_і_шпы", 11402240861085748ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kWeak, "_і_фы", 7341684740097667ULL},
             },
         },
         {
             "малацьба",
             7,
             {
-                {0, "б_а_", 8508740673753778ULL},
-                {1, "б_а_", 8508740673753778ULL},
-                {2, "_а_", 9525167144504378ULL},
-                {3, "_а_", 9525167144504378ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kIdeal, "б_а_", 8508740673753778ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kGood, "б_а_", 8508740673753778ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kMedium, "_а_", 9525167144504378ULL},
+                {ryfmach::bel::RhymeMistakeLevel::kWeak, "_а_", 9525167144504378ULL},
             },
         },
     };
@@ -365,9 +434,9 @@ TEST(Rhymes, MatchesKnownWorkingPartsAndHashes) {
         SCOPED_TRACE(test_case.word);
 
         for (const auto& mistake_case : test_case.mistakes) {
-            SCOPED_TRACE(mistake_case.mistake);
+            SCOPED_TRACE(static_cast<int>(mistake_case.mistake));
 
-            EXPECT_EQ(ryfmach::bel::WorkingPart(
+            EXPECT_EQ(ryfmach::bel::CalcWorkingPart(
                           test_case.word, test_case.stress, mistake_case.mistake),
                       mistake_case.working_part);
             EXPECT_EQ(ryfmach::bel::SoundHash(
@@ -456,7 +525,7 @@ TEST(Rhymes, CalculatesKnownRhymeQualityKeys) {
         ASSERT_TRUE(right.has_value());
 
         const auto [suffix_cost, prefix_cost] =
-            ryfmach::bel::CalcRhymeQualityKey(*left, *right, 2);
+            ryfmach::bel::CalcRhymeCost(*left, *right, 2);
 
         EXPECT_DOUBLE_EQ(suffix_cost, test_case.suffix_cost);
         EXPECT_DOUBLE_EQ(prefix_cost, test_case.prefix_cost);
@@ -544,6 +613,76 @@ TEST(Slounik, GetsWordForms) {
     EXPECT_EQ(words[0].word, "хата");
     EXPECT_EQ(words[1].word, "хаце");
     EXPECT_EQ(words[1].initial_word, "хата");
+}
+
+TEST(Slounik, FindsIdealRhymesBySoundHash) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const auto input_word = slounik.GetWordById(1);
+    ASSERT_TRUE(input_word.has_value());
+
+    const auto rhymes = slounik.FindRhymes(
+        *input_word,
+        ryfmach::bel::SearchMistakeLevel::kIdeal,
+        ryfmach::bel::RhymeSearchFilters{},
+        20);
+
+    EXPECT_EQ(RhymeWordIds(rhymes), std::vector<int>{5});
+}
+
+TEST(Slounik, FindsGoodRhymesBySoundHash) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const auto input_word = slounik.GetWordById(1);
+    ASSERT_TRUE(input_word.has_value());
+
+    const auto rhymes = slounik.FindRhymes(
+        *input_word,
+        ryfmach::bel::SearchMistakeLevel::kGood,
+        ryfmach::bel::RhymeSearchFilters{},
+        20);
+
+    EXPECT_EQ(RhymeWordIds(rhymes), std::vector<int>{6});
+}
+
+TEST(Slounik, FindsMediumRhymesBySoundHash) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const auto input_word = slounik.GetWordById(1);
+    ASSERT_TRUE(input_word.has_value());
+
+    const auto rhymes = slounik.FindRhymes(
+        *input_word,
+        ryfmach::bel::SearchMistakeLevel::kMedium,
+        ryfmach::bel::RhymeSearchFilters{},
+        20);
+
+    EXPECT_EQ(RhymeWordIds(rhymes), std::vector<int>{7});
+}
+
+TEST(Slounik, FindsWeakRhymesBySoundHash) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const auto input_word = slounik.GetWordById(1);
+    ASSERT_TRUE(input_word.has_value());
+
+    const auto rhymes = slounik.FindRhymes(
+        *input_word,
+        ryfmach::bel::SearchMistakeLevel::kWeak,
+        ryfmach::bel::RhymeSearchFilters{},
+        20);
+
+    EXPECT_EQ(RhymeWordIds(rhymes), std::vector<int>{8});
+}
+
+TEST(Slounik, FindsAdaptiveRhymesAcrossMistakeLevels) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const auto input_word = slounik.GetWordById(1);
+    ASSERT_TRUE(input_word.has_value());
+
+    const auto rhymes = slounik.FindRhymes(
+        *input_word,
+        ryfmach::bel::SearchMistakeLevel::kAdaptive,
+        ryfmach::bel::RhymeSearchFilters{},
+        20);
+
+    EXPECT_EQ(RhymeWordIds(rhymes), (std::vector<int>{5, 6, 7, 8}));
 }
 
 } // namespace

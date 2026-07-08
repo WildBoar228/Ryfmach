@@ -14,15 +14,22 @@
 
 namespace ryfmach::bel {
 
-std::optional<std::string> WorkingPart(
+enum class RhymeMistakeLevel {
+    kIdeal,
+    kGood,
+    kMedium,
+    kWeak
+};
+
+std::optional<std::string> CalcWorkingPart(
     std::string_view word,
     std::size_t stress,
-    int mistake = 0);
+    RhymeMistakeLevel mistake = RhymeMistakeLevel::kIdeal);
 
 std::optional<std::uint64_t> SoundHash(
     std::string_view word,
     std::size_t stress,
-    int mistake = 0);
+    RhymeMistakeLevel mistake = RhymeMistakeLevel::kIdeal);
 
 class SoundCompatibilityTable {
 public:
@@ -51,19 +58,24 @@ std::optional<SoundCompatibilityTable> LoadSoundCompatibilityTable(
 const SoundCompatibilityTable& DefaultSoundCompatibilityTable() noexcept;
 
 double SoundReplaceCost(Sound left, Sound right) noexcept;
+
 double SoundReplaceCost(
     Sound left,
     Sound right,
     const SoundCompatibilityTable& table) noexcept;
+
 double SoundReplaceCost(
     std::optional<Sound> left,
     std::optional<Sound> right) noexcept;
+
 double SoundReplaceCost(
     std::optional<Sound> left,
     std::optional<Sound> right,
     const SoundCompatibilityTable& table) noexcept;
 
-std::pair<double, double> CalcRhymeQualityKey(
+using RhymeCostType = std::pair<double, double>;
+
+RhymeCostType CalcRhymeCost(
     std::span<const Sound> t1,
     std::span<const Sound> t2,
     int max_shift);
