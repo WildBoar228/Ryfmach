@@ -1,0 +1,59 @@
+
+
+    <form id="search-form" class="center-block" autocomplete="off">
+        <div class="search-block">
+            <label class="visually-hidden" for="search-input">Слова для пошуку</label>
+            <input type="search" class="word-search" id="search-input" placeholder="Увядзіце слова..." value="{{ input_word }}" autocomplete="off" autofocus>
+            {% if add_search_filter_button %}
+            <button type="button" class="button-filters modest-button" data-bs-toggle="offcanvas" data-bs-target="#filters-offcanvas" aria-controls="filters-offcanvas" aria-label="Адкрыць фільтры">
+                <i id="filters-icon" class="fa fa-cog" aria-hidden="true"></i>
+            </button>
+            {% endif %}
+            <button id="search-button" type="submit" class="button-search bright-button" aria-label="Шукаць">
+                <i id="search-icon" class="fa fa-search" aria-hidden="true"></i>
+                <span id="search-spinner" class="spinner-border spinner-border-sm button-spinner" hidden aria-hidden="true"></span>
+            </button>
+        </div>
+    </form>
+
+    <div id="search-status-info" class="center-block" role="status" aria-live="polite"> </div>
+
+    <div class="modal" tabindex="-1" id="manual-accent-modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title info-text">Укажыце націскную галосную</h5>
+                    <button type="button" class="close-button" data-bs-dismiss="modal" aria-label="Close"><i class="fa fa-times" aria-hidden="true"></i></button>
+                </div>
+                <div class="modal-body">
+
+                    <div class="center-block" id="manual-accent-block">
+                        <div class="letter-buttons-block" id="letter-buttons-block">
+                            
+                        </div>
+                    </div>
+                    
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="dull-button rhyme-word" data-bs-dismiss="modal">Адмена</button>
+                    <button id="search-accent-button" type="button" class="bright-button rhyme-word">Далей</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="word-variants-block" class="center-block hidden-visibility">
+        <div class="dropdown">
+            <button class="dropdown-light rhyme-word" type="button" id="dropdown-choose-word" data-bs-toggle="dropdown" aria-expanded="false">
+                -
+            </button>
+            <ul class="dropdown-menu" id="dropdown-choose-word-menu" aria-labelledby="dropdown-choose-word">
+                
+            </ul>
+        </div>
+        <div class="info-text">
+            <p id="search-status-text" class="search-status-text">Нічога няма</p>
+        </div>
+    </div>
+
+    <div id="error-msg"></div>

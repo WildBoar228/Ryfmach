@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="be">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="{{ page_description }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="{{url_for('static', filename='css/style.css') + '?ver=1.5.3'}}">
+    {% block styles %}{% endblock %}
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <title>{{ title }}</title>
+</head>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-CM6B96XVV0"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-CM6B96XVV0');
+</script>
+<!-- Google tag (gtag.js) -->
+ 
+    <body>
+        <nav class="main-navbar">
+        <button type="button" class="nav-button dull-button" data-bs-toggle="offcanvas" data-bs-target="#links-offcanvas" aria-controls="links-offcanvas" aria-label="Адкрыць меню">
+            <i id="filters-icon" class="fa fa-bars"></i>
+        </button>
+    </nav>
+    <img src="{{ url_for('static', filename='img/logo.png') }}" class="main-logo" alt="Рыфмач">
+
+    {% block content %}{% endblock %}
+    
+    <div class="offcanvas offcanvas-top h-auto links-offcanvas" data-bs-scroll="true" tabindex="-1" id="links-offcanvas" aria-labelledby="links-offcanvasExampleLabel">
+        <div class="offcanvas-header">
+            <h2 class="offcanvas-title mid-header" id="links-offcanvasExampleLabel">Спасылкі</h2>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+            <div class="offcanvas-body">
+                <div class="nav-links-box">
+                <a class="modest-button nav-link-button" href="/">Пошук рыфмаў</a>
+                <a class="modest-button nav-link-button" href="/phonetics">Фанетычны разбор</a>
+                <a class="modest-button nav-link-button" href="/morphemics">Марфемны разбор <sup class="beta-mark">&beta;</sup></a>
+            </div>
+        </div>
+    </div>
+
+    {% block scripts %}{% endblock %}
+    
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+        (function(m,e,t,r,i,k,a){
+            m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+            m[i].l=1*new Date();
+            for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+            k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+        })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=103914674', 'ym');
+
+        ym(103914674, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", accurateTrackBounce:true, trackLinks:true});
+    </script>
+    <noscript><div><img src="https://mc.yandex.ru/watch/103914674" class="metrika-pixel" alt="" /></div></noscript>
+    <!-- /Yandex.Metrika counter -->
+</body>
+</html>

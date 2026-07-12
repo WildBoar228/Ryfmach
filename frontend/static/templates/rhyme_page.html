@@ -1,0 +1,189 @@
+{% extends "index.html" %}
+
+{% block content %}
+    <div class="header-block">
+        <p class="greeting">
+            Вітаю!
+        </p>
+        <p class="description">
+            Рыфмач&nbsp;&ndash; Ваш дапаможнік у складанні вершаў на беларускай мове. Увядзіце слова, каб падабраць да яго рыфму.
+        </p>
+    </div>
+
+    {% include "search_panel.html" %}
+
+    <div class="rhymes-block is-hidden" id="rhymes-block">
+        <div class="center-block rhyme-count-row">
+            <h1 class="rhyme-word" id="rhyme-count-text"></h1>
+        </div>
+        <ul class="rhymes-list" id="rhymes-list">
+        {% include "rhymes_content.html" %}
+        </ul>
+    </div>
+
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="filters-offcanvas" aria-labelledby="filters-offcanvasExampleLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="filters-offcanvasExampleLabel">Фільтры</h5>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <div>
+                <h1 class="mid-header">Трапнасць пошуку</h1>
+
+                <div id="search-mistake-radio">
+                    <div class="form-check">
+                        <input class="yellow-checkbox" type="radio" name="radioMistake" id="radio-mistake-adapt" value="-1" checked>
+                        <label class="small-info-text" for="radio-mistake-adapt">
+                            Адаптыўная
+                        </label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="yellow-checkbox" type="radio" name="radioMistake" id="radio-mistake-0" value="0">
+                        <label class="small-info-text" for="radio-mistake-0">
+                            Ідэяльная
+                        </label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="yellow-checkbox" type="radio" name="radioMistake" id="radio-mistake-1" value="1">
+                        <label class="small-info-text" for="radio-mistake-1">
+                            Добрая
+                        </label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="yellow-checkbox" type="radio" name="radioMistake" id="radio-mistake-2" value="2">
+                        <label class="small-info-text" for="radio-mistake-2">
+                            Сярэдняя
+                        </label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="yellow-checkbox" type="radio" name="radioMistake" id="radio-mistake-3" value="3">
+                        <label class="small-info-text" for="radio-mistake-3">
+                            Слабая
+                        </label>
+                    </div>
+                </div>
+
+                <h1 class="mid-header">Сарціроўка</h1>
+
+                <div id="sort-mode-radio">
+                    <div class="form-check">
+                        <input class="yellow-checkbox" type="radio" name="radioSort" id="radio-sort-alphabet" value="alphabet">
+                        <label class="small-info-text" for="radio-sort-alphabet">
+                            Па алфавіце
+                        </label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="yellow-checkbox" type="radio" name="radioSort" id="radio-sort-quality" value="quality" checked>
+                        <label class="small-info-text" for="radio-sort-quality">
+                            Па якасці <sup class="beta-mark">&beta;</sup>
+                        </label>
+                    </div>
+                </div>
+
+                <h1 class="mid-header">Часціны мовы</h1>
+                
+                <div class="form-check">
+                    <input class="yellow-checkbox" type="checkbox" value="" id="check-posp-1" checked>
+                    <label class="small-info-text" for="check-posp-1">
+                        Назоўнік
+                    </label>
+                </div>
+                
+                <div class="form-check">
+                    <input class="yellow-checkbox" type="checkbox" value="" id="check-posp-2" checked>
+                    <label class="small-info-text" for="check-posp-2">
+                        Дзеяслоў
+                    </label>
+                </div>
+                
+                <div class="form-check">
+                    <input class="yellow-checkbox" type="checkbox" value="" id="check-posp-3" checked>
+                    <label class="small-info-text" for="check-posp-3">
+                        Прыметнік
+                    </label>
+                </div>
+                
+                <div class="form-check">
+                    <input class="yellow-checkbox" type="checkbox" value="" id="check-posp-4" checked>
+                    <label class="small-info-text" for="check-posp-4">
+                        Займеннік
+                    </label>
+                </div>
+                
+                <div class="form-check">
+                    <input class="yellow-checkbox" type="checkbox" value="" id="check-posp-5" checked>
+                    <label class="small-info-text" for="check-posp-5">
+                        Лічэбнік
+                    </label>
+                </div>
+                
+                <div class="form-check">
+                    <input class="yellow-checkbox" type="checkbox" value="" id="check-posp-6" checked>
+                    <label class="small-info-text" for="check-posp-6">
+                        Прыслоўе
+                    </label>
+                </div>
+                
+                <div class="form-check">
+                    <input class="yellow-checkbox" type="checkbox" value="" id="check-posp-7" checked>
+                    <label class="small-info-text" for="check-posp-7">
+                        Службовыя
+                    </label>
+                </div>
+                
+                <h1 class="mid-header">Форма</h1>
+                
+                <div class="form-check">
+                    <input class="yellow-checkbox" type="checkbox" value="" id="check-only-initial">
+                    <label class="small-info-text" for="check-only-initial">
+                        Толькі пачатковая
+                    </label>
+                </div>
+            </div>
+
+            <br>
+            <button id="save-filters-button" type="button" class="bright-button rhyme-word" data-bs-dismiss="offcanvas">Захаваць</button>
+        </div>
+    </div>
+
+    <button class="button-scroll-up bright-button" type="button" aria-label="Пракруціць уверх">
+        <i class="fa fa-chevron-up" aria-hidden="true"></i>
+    </button>
+
+    <div class="faq-block">
+        <div class="faq-item">
+            <p class="mid-header"> Як працуе пошук рыфмаў? </p>
+            <p class="info-text"> Рыфмач выкарыстоўвае вялікую базу дадзеных, каб знайсці слова, якое Вы ўвялі, і вызначыць ў ім націск. Калі слоў з такім напісаннем некалькі, Вы можаце абраць любы варыянт з дапамогай блакітнай кнопкі. Пасля Рыфмач будуе транскрыпцыю і падбірае падобныя па гучанні словы. </p>
+        </div>
+        <div class="faq-item">
+            <p class="mid-header"> Як знайсці рыфму да слова, якога няма ў базе? </p>
+            <p class="info-text"> У такім выпадку Вам будзе прапанавана ўказаць націскную галосную самастойна, гэтага дастаткова для пошуку. </p>
+        </div>
+        <div class="faq-item">
+            <p class="mid-header"> Не знайшлося ніводнай рыфмы, як з гэтым жыць? </p>
+            <p class="info-text"> На жаль, так бывае. З дапамогай фільтра "Трапнасць пошуку" Вы можаце знайсці меней строгія рыфмы. Калі вы ведаеце рыфму, якой не ведае Рыфмач, або Вы сутыкнуліся з іншай праблемай, калі ласка, напішыце пра гэта на пошту <a class="accent-link" href="mailto:issues@ryfmach.online">issues@ryfmach.online</a>. </p>
+        </div>
+        <div class="faq-item">
+            <p class="mid-header"> Я бачу зашмат падобных рыфмаў, што рабіць? </p>
+            <p class="info-text"> Вы можаце выкарыстоўваць фільтры (<i class="fa fa-cog" aria-hidden="true"></i>), каб прыбраць славаформы або словы пэўных часцін мовы. </p>
+        </div>
+        <div class="faq-item">
+            <p class="mid-header"> Мне вельмі падабаецца Рыфмач. Як я магу дапамагчы праэкту? </p>
+            <p class="info-text"> Мы стараемся! 😀 Распавядзіце пра Рыфмача сваім сябрам і іншым аматарам вершаў, каб і яны маглі карыстацца сайтам! </p>
+        </div>
+    </div>
+    
+{% endblock %}
+
+{% block scripts %}
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js" integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q" crossorigin="anonymous"></script>
+    <script src="{{url_for('static', filename='js/rhymes.js') + '?ver=1.5.3'}}" type="text/javascript"></script>
+{% endblock %}

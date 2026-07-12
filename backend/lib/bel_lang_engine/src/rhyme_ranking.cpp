@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "rhyme_ranking.hpp"
 #include "rhymes.hpp"
 #include "transcription.hpp"

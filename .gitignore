@@ -1,0 +1,9 @@
+db/
+log_archive/
+logs/
+
+.codex/
+.agents/
+.vscode/
+
+.env

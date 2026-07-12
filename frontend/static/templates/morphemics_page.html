@@ -1,0 +1,53 @@
+{% extends "index.html" %}
+
+{% block styles %}
+    <link rel="stylesheet" href="{{url_for('static', filename='css/morphemics.css') + '?ver=1.1.0'}}">
+{% endblock %}
+
+{% block content %}
+    <div class="header-block">
+        <p class="greeting">
+            Марфемны разбор слова па складзе <sup class="beta-mark">&beta;</sup>
+        </p>
+        <p class="description">
+            Увядзіце слова, і Рыфмач вызначыць, з якіх марфем (частак слова) яно складаецца.
+        </p>
+    </div>
+
+    {% include "search_panel.html" %}
+
+    <div id="sklad-analysis-block" class="sklad-analysis-block">
+    </div>
+
+    <button class="button-scroll-up bright-button" type="button" aria-label="Пракруціць уверх">
+        <i class="fa fa-chevron-up" aria-hidden="true"></i>
+    </button>
+
+    <div class="faq-block">
+        <div class="faq-item">
+            <p class="mid-header"> Чаму я бачу разбор пачатковай формы слова? </p>
+            <p class="info-text"> Вам будзе прапанаваны разбор пачатковай формы ўведзенага слова, таму што ён, верагодна, будзе больш дакладны (звычайна ён адрозніваецца толькі канчаткам). Разбор іншых форм зараз у распрацоўцы. </p>
+        </div>
+        <div class="faq-item">
+            <p class="mid-header"> Что азначае <i class="fa fa-warning warning-icon" aria-hidden="true"></i>? </p>
+            <p class="info-text"> Калі ўведзенага слова няма у слоўніку марфемных разбораў Рыфмача, але яно ёсць у агульным слоўніку, ён аналізуе граматычныя прыкметы слова, формы и паказвае здагадку. Знак папярэджвае, што разбор можа быць памылковым. </p>
+        </div>
+        <div class="faq-item">
+            <p class="mid-header"> Маё слова не знойдзена </p>
+            <p class="info-text"> Пакуль Рыфмач умее разбіраць толькі словы, якія ёсць у яго ў слоўніку. Слова можа адсутнічаць там, калі яго разбор занадта просты (як у слова сад, напрыклад) або калі яно рэдка выкарыстоўваецца. </p>
+        </div>
+        <div class="faq-item">
+            <p class="mid-header"> Знайшлі памылку або хочаце павялічыць слоўнік? </p>
+            <p class="info-text"> Паведаміце, калі ласка, нашай камандзе на пошту: <a class="accent-link" href="mailto:issues@ryfmach.online">issues@ryfmach.online</a>. Таксама звяртайцеся туды для зваротный сувязі ці па іншых пытаннях. </p>
+        </div>
+    </div>
+    
+{% endblock %}
+
+{% block scripts %}
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js" integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q" crossorigin="anonymous"></script>
+    <script src="{{url_for('static', filename='js/morphemics.js') + '?ver=1.1.0'}}" type="text/javascript"></script>
+{% endblock %}

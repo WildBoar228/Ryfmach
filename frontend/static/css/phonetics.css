@@ -1,0 +1,96 @@
+.phon-analysis-block {
+    width: min(100% - 32px, 900px);
+    margin: auto;
+    margin-top: 30px;
+}
+
+.transcription-block {
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding: 5vh 10vw 5vh 10vw;
+    gap: 10pt;
+    font: bold 16pt Arial, sans-serif;
+}
+
+.transcription-cons-soft {
+    color: forestgreen;
+}
+
+.transcription-cons-hard {
+    color: blue;
+}
+
+.transcription-vowel {
+    color: firebrick;
+}
+
+.sound-analysis-block {
+    display: flex;
+    flex-direction: column;
+    gap: 10pt;
+    align-items: flex-start;
+}
+
+.sound-analysis-line {
+    display: flex;
+    justify-content: flex-start;
+    gap: 10pt;
+    align-items: center;
+    width: 100%;
+    border-radius: 10px;
+    padding: 10px;
+    overflow-wrap: anywhere;
+}
+
+.sound-analysis-line.line1 {
+    background-color: #f2f2f2;
+}
+
+.sound-analysis-group {
+    min-width: 32px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: fit-content;
+}
+
+.sound-analysis-letters {
+    font-weight: bold;
+}
+
+.sound-analysis-details {
+    width: fit-content;
+}
+
+@media (max-width: 640px) {
+    .phon-analysis-block {
+        width: calc(100% - 24px);
+        margin-top: 24px;
+    }
+
+    .transcription-block {
+        padding: 20px 0;
+        gap: 10px;
+        font: bold 1.5rem Arial, sans-serif;
+    }
+
+    .sound-analysis-block {
+        gap: 12px;
+    }
+
+    .sound-analysis-line {
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 8px;
+    }
+
+    .sound-analysis-group {
+        min-width: 28px;
+    }
+
+    .sound-analysis-details {
+        min-width: 0;
+    }
+}

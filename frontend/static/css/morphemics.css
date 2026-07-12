@@ -1,0 +1,68 @@
+.sklad-analysis-block {
+    width: min(100% - 32px, 900px);
+    margin: auto;
+    margin-top: 30px;
+}
+
+.analysed-word-block {
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding: clamp(24px, 5vh, 56px) 24px;
+    gap: 4pt;
+    overflow-wrap: anywhere;
+}
+
+.word-part {
+    min-width: 14pt;
+    border-radius: 4pt;
+    text-align: center;
+    font: bold 16pt Arial, sans-serif;
+}
+
+.word-part-unknown {
+    background-color: lightgray;
+}
+
+.word-part-prefix {
+    background-image: url("/static/img/morphemics/prefix.png");
+    background-size: 100% 100%;
+    /* background-color: cadetblue; */
+}
+
+.word-part-root {
+    background-image: url("/static/img/morphemics/root.png");
+    background-size: 100% 100%;
+    /* background-color: peru; */
+}
+
+.word-part-suffix {
+    background-image: url("/static/img/morphemics/suffix.png");
+    background-size: 100% 100%;
+    /* background-color: lightgreen; */
+}
+
+.word-part-ending {
+    background-image: url("/static/img/morphemics/ending.png");
+    background-size: 100% 100%;
+    /* background-color: indianred; */
+}
+
+@media (max-width: 640px) {
+    .sklad-analysis-block {
+        width: calc(100% - 24px);
+        margin-top: 24px;
+    }
+
+    .analysed-word-block {
+        padding: 20px 0;
+        gap: 6px;
+    }
+    
+    .word-part {
+        min-width: 32px;
+        border-radius: 6px;
+        font: bold 1.5rem Arial, sans-serif;
+    }
+}
