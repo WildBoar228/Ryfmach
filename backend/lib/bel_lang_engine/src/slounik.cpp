@@ -398,7 +398,7 @@ private:
         SQLite::Statement query(
             db_,
             WordRecordSelectSql() +
-            "WHERE w.id != ? AND " +
+            "WHERE w.word != ? AND " +
             BuildSoundHashFilter(mistake) + 
             R"sql(
                 ORDER BY w.word, w.initial_id, w.accent_index
@@ -406,7 +406,7 @@ private:
             )sql");
 
         int placehold_index = 1;
-        query.bind(placehold_index++, input_word.id);
+        query.bind(placehold_index++, input_word.word);
         for (auto iter_mistake : {RhymeMistakeLevel::kIdeal,
                                   RhymeMistakeLevel::kGood,
                                   RhymeMistakeLevel::kMedium,
@@ -474,7 +474,7 @@ std::vector<WordRecord> Slounik::GetWordForms(int initial_id) const {
 std::vector<Rhyme> Slounik::FindRhymes(
     const WordRecord& input_word,
     SearchMistakeLevel mistake,
-    RhymeSearchFilters filters,
+    const RhymeSearchFilters& filters,
     std::size_t max_cnt
 ) const {
     RhymeMistakeLevel rhyme_mistake;
@@ -504,6 +504,21 @@ std::vector<Rhyme> Slounik::FindRhymes(
         rhyme_mistake,
         filters,
         max_cnt);
+}
+
+std::vector<Rhyme> Slounik::FindRhymes(
+    std::string_view word,
+    std::size_t accent,
+    SearchMistakeLevel mistake,
+    const RhymeSearchFilters& filters,
+    std::size_t max_cnt
+) const {
+    const WordRecord input_word{
+        .word = std::string(word),
+        .accent = accent,
+    };
+
+    return FindRhymes(input_word, mistake, filters, max_cnt);
 }
 
 } // namespace ryfmach::bel

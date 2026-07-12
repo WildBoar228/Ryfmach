@@ -21,6 +21,7 @@ target_link_libraries(
     GTest::gtest_main
     GTest::gmock_main
     bel_lang_engine
+    ryfmach_service
 )
 
 target_compile_options(ryfmach_tests PRIVATE "-fsanitize=address,leak,undefined" "-O3")

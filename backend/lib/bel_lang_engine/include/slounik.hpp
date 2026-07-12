@@ -63,9 +63,17 @@ public:
     std::vector<WordRecord> GetWordForms(int initial_id) const;
 
     std::vector<Rhyme> FindRhymes(
-        const WordRecord& input_word,
+        const WordRecord&,
         SearchMistakeLevel,
-        RhymeSearchFilters,
+        const RhymeSearchFilters&,
+        std::size_t max_cnt
+    ) const;
+
+    std::vector<Rhyme> FindRhymes(
+        std::string_view word,
+        std::size_t accent,
+        SearchMistakeLevel,
+        const RhymeSearchFilters&,
         std::size_t max_cnt
     ) const;
 
