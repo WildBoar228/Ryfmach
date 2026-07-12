@@ -291,6 +291,7 @@ public:
         std::vector<Rhyme> rhymes = WordsToRhymesWithScore(
             input_word,
             std::move(candidates));
+        SortRhymes(rhymes);
         return rhymes;
     }
 
