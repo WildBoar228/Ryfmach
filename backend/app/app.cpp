@@ -16,7 +16,7 @@ std::string GetHostName() {
 
 int GetPort() {
     constexpr int kDefaultPort = 8080;
-    const char* port_str = std::getenv("RYFMACH_APP_PORT");
+    const char* port_str = std::getenv("RYFMACH_API_PORT");
     if (port_str == nullptr) {
         return kDefaultPort;
     }
