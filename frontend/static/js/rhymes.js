@@ -374,7 +374,7 @@ function post_rhymes_request(){
     rhymes_block.style.display = "none";
 
     $.ajax({
-        url: "/rhymes",
+        url: "/api/rhymes",
         method: "post",
         dataType: "json",
         contentType: "application/json",
@@ -421,7 +421,7 @@ function post_rhymes_with_manual_accent(){
     set_loading(true);
 
     $.ajax({
-        url: "/rhymes",
+        url: "/api/rhymes",
         method: "post",
         dataType: "json",
         contentType: "application/json",
@@ -464,7 +464,7 @@ function update_filters(){
 
     if (accent_index == -1){
         $.ajax({
-            url: "/rhymes",
+            url: "/api/rhymes",
             method: "post",
             dataType: "json",
             contentType: "application/json",
@@ -484,7 +484,7 @@ function update_filters(){
     }
     else{
         $.ajax({
-            url: "/rhymes",
+            url: "/api/rhymes",
             method: "post",
             dataType: "json",
             contentType: "application/json",

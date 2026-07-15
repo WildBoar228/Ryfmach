@@ -4,6 +4,7 @@
 #include "language.hpp"
 
 #include <optional>
+#include <string>
 #include <string_view>
 
 namespace ryfmach::bel {
@@ -14,6 +15,7 @@ struct Sound {
 };
 
 std::string_view SoundSpelling(Sound sound) noexcept;
+std::string SoundDescription(Sound sound);
 
 bool IsConsonantPhoneme(Phoneme sound) noexcept;
 bool IsVowelSound(Phoneme sound) noexcept;

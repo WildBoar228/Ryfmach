@@ -5,6 +5,7 @@
 
 #include <exception>
 #include <iostream>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -61,6 +62,53 @@ json RhymesResultToJson(const RhymesResult& result) {
     };
 }
 
+json SoundsToJson(std::span<const bel::Sound> sounds) {
+    json result = json::array();
+    for (const bel::Sound sound : sounds) {
+        result.push_back(bel::SoundSpelling(sound));
+    }
+    return result;
+}
+
+json PhoneticAnalysisToJson(const PhoneticAnalysis& analysis) {
+    json letter_map = json::array();
+    for (const auto& mapping : analysis.letter_map) {
+        json mapped_letters = json::array();
+        mapped_letters.push_back(mapping.letters);
+        mapped_letters.push_back(mapping.sounds);
+        letter_map.push_back(std::move(mapped_letters));
+    }
+
+    json phenomena = json::array();
+    for (const auto& occurrence : analysis.phenomena) {
+        json phenomenon = json::array();
+        phenomenon.push_back(occurrence.sound_index);
+        phenomenon.push_back(SoundsToJson(occurrence.transcription));
+        phenomenon.push_back(static_cast<int>(occurrence.phenomenon));
+        phenomena.push_back(std::move(phenomenon));
+    }
+
+    return {
+        {"word_variant", WordRecordToJson(analysis.word_variant)},
+        {"letter_map", std::move(letter_map)},
+        {"transcription", SoundsToJson(analysis.transcription)},
+        {"phenomena", std::move(phenomena)},
+        {"sound_analysis", analysis.sound_analysis},
+    };
+}
+
+json PhoneticsResultToJson(const PhoneticsResult& result) {
+    json word_variants = json::array();
+    for (const auto& analysis : result.word_variants) {
+        word_variants.push_back(PhoneticAnalysisToJson(analysis));
+    }
+
+    return {
+        {"word_variants", std::move(word_variants)},
+        {"word_found", result.word_found},
+    };
+}
+
 void WriteJson(httplib::Response& res, int status, const json& body) {
     res.status = status;
     res.set_content(body.dump(), "application/json");
@@ -98,6 +146,41 @@ void HandleRhymesRequest(
     }
 }
 
+void HandlePhoneticsRequest(
+    const httplib::Request& req,
+    httplib::Response& res,
+    const RyfmachService& service) {
+    try {
+        const json request = json::parse(req.body);
+        if (!request.contains("word") || request.at("word").is_null()) {
+            WriteJson(
+                res,
+                200,
+                {{"word_variants", json::array()}, {"word_found", false}});
+            return;
+        }
+
+        const std::string word = request.at("word").get<std::string>();
+        if (request.contains("accent") && !request.at("accent").is_null()) {
+            const std::size_t accent = request.at("accent").get<std::size_t>();
+            WriteJson(
+                res,
+                200,
+                PhoneticsResultToJson(service.AnalyzePhonetics(word, accent)));
+        } else {
+            WriteJson(res, 200, PhoneticsResultToJson(service.AnalyzePhonetics(word)));
+        }
+    } catch (const json::exception&) {
+        WriteJson(
+            res,
+            400,
+            {{"error", "Request body must be JSON with a word string."}});
+    } catch (const std::exception& exception) {
+        std::cerr << "failed to analyze phonetics: " << exception.what() << '\n';
+        WriteJson(res, 500, {{"error", "Unable to analyze phonetics."}});
+    }
+}
+
 } // namespace
 
 RyfmachServer::RyfmachServer(const RyfmachService& service)
@@ -113,9 +196,17 @@ bool RyfmachServer::Listen(std::string_view host, int port) const {
         });
 
     server.Post(
-        "/rhymes",
+        "/api/rhymes",
         [this](const httplib::Request& req, httplib::Response& res) {
+            std::cout << "/api/rhymes\n";
             HandleRhymesRequest(req, res, service_);
+        });
+
+    server.Post(
+        "/api/phonetics",
+        [this](const httplib::Request& req, httplib::Response& res) {
+            std::cout << "/api/phonetics\n";
+            HandlePhoneticsRequest(req, res, service_);
         });
 
     return server.listen(std::string(host), port);

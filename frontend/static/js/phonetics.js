@@ -325,7 +325,7 @@ function post_phon_request(){
     set_loading(true);
 
     $.ajax({
-        url: "/phonetics",
+        url: "/api/phonetics",
         method: "post",
         dataType: "json",
         contentType: "application/json",
@@ -368,7 +368,7 @@ function post_phon_with_manual_accent(){
     set_loading(true);
 
     $.ajax({
-        url: "/phonetics",
+        url: "/api/phonetics",
         method: "post",
         dataType: "json",
         contentType: "application/json",

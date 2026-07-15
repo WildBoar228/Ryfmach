@@ -66,7 +66,7 @@ std::optional<ConsonantData> GetConsonantData(Phoneme sound) noexcept {
     return std::nullopt;
 }
 
-std::optional<Phoneme> PairByData(std::size_t group, bool thud, bool soft) noexcept {
+std::optional<Phoneme> ConsonantByData(std::size_t group, bool thud, bool soft) noexcept {
     for (const auto& data : kConsonants) {
         if (data.group == group && data.thud == thud && data.soft == soft) {
             return data.sound;
@@ -109,6 +109,60 @@ std::string_view SoundSpelling(Sound sound) noexcept {
         default:
             return PhonemeSpelling(sound.phoneme);
     }
+}
+
+std::string SoundDescription(Sound sound) {
+    if (IsVowelSound(sound)) {
+        return sound.stressed ? "галосны, націскны"
+                              : "галосны, ненаціскны";
+    }
+
+    if (!IsConsonantPhoneme(sound.phoneme)) {
+        return "";
+    }
+
+    std::string description = "зычны, ";
+    if (IsRing(sound.phoneme)) {
+        description += "звонкі ";
+        if (const auto pair = ThudPair(sound.phoneme)) {
+            description += "парны [";
+            description += PhonemeSpelling(*pair);
+            description += "], ";
+        } else {
+            description += "няпарны, ";
+        }
+    } else if (IsThud(sound.phoneme)) {
+        description += "глухі ";
+        if (const auto pair = RingPair(sound.phoneme)) {
+            description += "парны [";
+            description += PhonemeSpelling(*pair);
+            description += "], ";
+        } else {
+            description += "няпарны, ";
+        }
+    }
+
+    if (IsSoft(sound.phoneme)) {
+        description += "мяккі ";
+        if (const auto pair = HardPair(sound.phoneme)) {
+            description += "парны [";
+            description += PhonemeSpelling(*pair);
+            description += "]";
+        } else {
+            description += "няпарны";
+        }
+    } else if (IsHard(sound.phoneme)) {
+        description += "цвёрды ";
+        if (const auto pair = SoftPair(sound.phoneme)) {
+            description += "парны [";
+            description += PhonemeSpelling(*pair);
+            description += "]";
+        } else {
+            description += "няпарны";
+        }
+    }
+
+    return description;
 }
 
 bool IsConsonantPhoneme(Phoneme sound) noexcept {
@@ -196,7 +250,7 @@ std::optional<Phoneme> RingPair(Phoneme sound) noexcept {
         return std::nullopt;
     }
 
-    return PairByData(data->group, false, data->soft);
+    return ConsonantByData(data->group, false, data->soft);
 }
 
 std::optional<Phoneme> ThudPair(Phoneme sound) noexcept {
@@ -205,7 +259,7 @@ std::optional<Phoneme> ThudPair(Phoneme sound) noexcept {
         return std::nullopt;
     }
 
-    return PairByData(data->group, true, data->soft);
+    return ConsonantByData(data->group, true, data->soft);
 }
 
 std::optional<Phoneme> HardPair(Phoneme sound) noexcept {
@@ -214,7 +268,7 @@ std::optional<Phoneme> HardPair(Phoneme sound) noexcept {
         return std::nullopt;
     }
 
-    return PairByData(data->group, data->thud, false);
+    return ConsonantByData(data->group, data->thud, false);
 }
 
 std::optional<Phoneme> SoftPair(Phoneme sound) noexcept {
@@ -230,7 +284,7 @@ std::optional<Phoneme> SoftPair(Phoneme sound) noexcept {
         return std::nullopt;
     }
 
-    return PairByData(data->group, data->thud, true);
+    return ConsonantByData(data->group, data->thud, true);
 }
 
 std::optional<Phoneme> WhistlingPair(Phoneme sound) noexcept {

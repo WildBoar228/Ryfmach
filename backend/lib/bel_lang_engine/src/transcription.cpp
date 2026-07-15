@@ -243,6 +243,189 @@ void Assimilate(std::vector<Sound>& transcription) {
     }
 }
 
+void RecordPhenomenon(
+    FullTranscription& result,
+    std::size_t sound_index,
+    PhoneticPhenomenon phenomenon
+) {
+    result.phenomena.push_back(PhoneticPhenomenonOccurrence{
+        .sound_index = sound_index,
+        .transcription = result.transcription,
+        .phenomenon = phenomenon,
+    });
+}
+
+bool NeedsFullIotation(
+    std::span<const Letter> word,
+    std::size_t index
+) noexcept {
+    const Letter letter = word[index];
+    if (letter == Letter::kI) {
+        if (index == 0) {
+            return false;
+        }
+
+        const Letter previous = word[index - 1];
+        return IsVowel(previous) || previous == Letter::kShortU ||
+               previous == Letter::kSoftSign || IsApostrophe(previous);
+    }
+
+    return NeedsIotation(word, index);
+}
+
+void InsertIotationSound(
+    FullTranscription& result,
+    std::size_t sound_index
+) {
+    result.transcription.insert(
+        result.transcription.begin() + static_cast<std::ptrdiff_t>(sound_index),
+        Sound{.phoneme = Phoneme::kJ, .stressed = false});
+
+    for (auto& letter_sounds : result.letter_to_sounds) {
+        for (std::size_t& mapped_sound : letter_sounds) {
+            if (mapped_sound >= sound_index) {
+                ++mapped_sound;
+            }
+        }
+        if (!letter_sounds.empty() &&
+            letter_sounds.front() == sound_index + 1) {
+            letter_sounds.insert(letter_sounds.begin(), sound_index);
+        }
+    }
+}
+
+void FoldFullAffricates(FullTranscription& result) {
+    for (std::size_t index = 0; index + 1 < result.transcription.size();
+         ++index) {
+        if (result.transcription[index].phoneme != Phoneme::kD) {
+            continue;
+        }
+
+        const Phoneme next = result.transcription[index + 1].phoneme;
+        Phoneme affricate;
+        if (next == Phoneme::kZh) {
+            affricate = Phoneme::kDzh;
+        } else if (next == Phoneme::kZ) {
+            affricate = Phoneme::kDz;
+        } else if (next == Phoneme::kZSoft) {
+            affricate = Phoneme::kDzSoft;
+        } else {
+            continue;
+        }
+
+        RecordPhenomenon(result, index, PhoneticPhenomenon::kAffricates);
+        result.transcription[index].phoneme = affricate;
+        result.transcription.erase(
+            result.transcription.begin() + static_cast<std::ptrdiff_t>(index + 1));
+        for (auto& letter_sounds : result.letter_to_sounds) {
+            for (std::size_t& mapped_sound : letter_sounds) {
+                if (mapped_sound >= index + 1) {
+                    --mapped_sound;
+                }
+            }
+        }
+    }
+}
+
+void AssimilateFull(FullTranscription& result) {
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (std::size_t index = 0; index < result.transcription.size(); ++index) {
+            Sound& current_sound = result.transcription[index];
+            const Phoneme current = current_sound.phoneme;
+            const bool has_next = index + 1 < result.transcription.size();
+
+            const auto thud_pair = ThudPair(current);
+            if (IsRing(current) && thud_pair &&
+                (!has_next || IsThud(result.transcription[index + 1].phoneme))) {
+                RecordPhenomenon(
+                    result, index, PhoneticPhenomenon::kThudAssimilation);
+                current_sound.phoneme = *thud_pair;
+                changed = true;
+            } else {
+                const auto ring_pair = RingPair(current);
+                if (IsThud(current) && ring_pair && has_next &&
+                    IsRing(result.transcription[index + 1].phoneme) &&
+                    !IsSonor(result.transcription[index + 1].phoneme)) {
+                    RecordPhenomenon(
+                        result, index, PhoneticPhenomenon::kRingAssimilation);
+                    current_sound.phoneme = *ring_pair;
+                    changed = true;
+                }
+            }
+
+            if (index + 1 < result.transcription.size()) {
+                const Phoneme sound = result.transcription[index].phoneme;
+                const Phoneme next = result.transcription[index + 1].phoneme;
+                const bool z_or_s_softening =
+                    (sound == Phoneme::kZ || sound == Phoneme::kS) && IsSoft(next) &&
+                    next != Phoneme::kHSoft && next != Phoneme::kKSoft &&
+                    next != Phoneme::kKhSoft;
+                const bool dental_softening =
+                    (sound == Phoneme::kD || sound == Phoneme::kT ||
+                     sound == Phoneme::kDz || sound == Phoneme::kTs) &&
+                    (next == Phoneme::kTsSoft || next == Phoneme::kDzSoft ||
+                     next == Phoneme::kVSoft);
+                if (z_or_s_softening || dental_softening) {
+                    if (const auto soft_pair = SoftPair(sound)) {
+                        RecordPhenomenon(
+                            result, index, PhoneticPhenomenon::kSoftAssimilation);
+                        result.transcription[index].phoneme = *soft_pair;
+                        changed = true;
+                    }
+                }
+
+                const Phoneme assimilated = result.transcription[index].phoneme;
+                const Phoneme assimilated_next =
+                    result.transcription[index + 1].phoneme;
+                if (IsHard(assimilated)) {
+                    if (const auto soft_pair = SoftPair(assimilated);
+                        soft_pair && assimilated_next == *soft_pair) {
+                        RecordPhenomenon(
+                            result, index, PhoneticPhenomenon::kSoftAssimilation);
+                        result.transcription[index].phoneme = *soft_pair;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (index + 1 < result.transcription.size()) {
+                const Phoneme sound = result.transcription[index].phoneme;
+                const Phoneme next = result.transcription[index + 1].phoneme;
+                if (IsHissing(sound) && IsWhistling(next)) {
+                    if (const auto whistling_pair = WhistlingPair(sound)) {
+                        RecordPhenomenon(
+                            result, index,
+                            PhoneticPhenomenon::kWhistlingAssimilation);
+                        result.transcription[index].phoneme = *whistling_pair;
+                        changed = true;
+                    }
+                } else if (IsWhistling(sound) && IsHissing(next)) {
+                    if (const auto hissing_pair = HissingPair(sound)) {
+                        RecordPhenomenon(
+                            result, index, PhoneticPhenomenon::kHissingAssimilation);
+                        result.transcription[index].phoneme = *hissing_pair;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (index + 1 < result.transcription.size()) {
+                const Phoneme sound = result.transcription[index].phoneme;
+                const Phoneme next = result.transcription[index + 1].phoneme;
+                if ((sound == Phoneme::kD || sound == Phoneme::kT) &&
+                    (next == Phoneme::kTs || next == Phoneme::kCh)) {
+                    RecordPhenomenon(
+                        result, index, PhoneticPhenomenon::kDentalAssimilation);
+                    result.transcription[index].phoneme = next;
+                    changed = true;
+                }
+            }
+        }
+    }
+}
+
 } // namespace
 
 std::optional<std::vector<Sound>> GetTranscriptionSounds(
@@ -297,6 +480,73 @@ std::optional<std::vector<Sound>> GetTranscriptionSounds(
     FoldAffricates(transcription);
     Assimilate(transcription);
     return transcription;
+}
+
+std::optional<FullTranscription> GetTranscriptionFull(
+    std::string_view word,
+    std::size_t stress
+) {
+    const auto parsed_word = ParseWord(word);
+    if (!parsed_word) {
+        return std::nullopt;
+    }
+
+    return GetTranscriptionFull(*parsed_word, stress);
+}
+
+std::optional<FullTranscription> GetTranscriptionFull(
+    std::span<const Letter> word,
+    std::size_t stress
+) {
+    if (stress >= word.size() || !IsVowel(word[stress])) {
+        return std::nullopt;
+    }
+
+    FullTranscription result;
+    result.letter_to_sounds.resize(word.size());
+    for (std::size_t index = 0; index < word.size(); ++index) {
+        const bool stressed = index == stress;
+        if (const auto vowel = PlainVowelSound(word[index])) {
+            AppendInitialSound(result.transcription, *vowel, stressed);
+        } else if (const auto vowel = IotatedVowelSound(word[index])) {
+            AppendInitialSound(result.transcription, *vowel, stressed);
+        } else if (const auto consonant = ConsonantSound(word[index])) {
+            AppendInitialSound(result.transcription, *consonant, false);
+        } else {
+            continue;
+        }
+        result.letter_to_sounds[index].push_back(result.transcription.size() - 1);
+    }
+
+    for (std::size_t index = 0; index < word.size(); ++index) {
+        if ((IotatedVowelSound(word[index]) || word[index] == Letter::kI) &&
+            NeedsFullIotation(word, index)) {
+            const std::size_t sound_index = result.letter_to_sounds[index].front();
+            RecordPhenomenon(result, sound_index, PhoneticPhenomenon::kIotation);
+            InsertIotationSound(result, sound_index);
+        } else if (const auto consonant = ConsonantSound(word[index])) {
+            const std::size_t sound_index = result.letter_to_sounds[index].back();
+            const auto soft_pair = SoftPair(*consonant);
+            if (index + 1 < word.size() &&
+                (IsSofteningVowel(word[index + 1]) ||
+                 word[index + 1] == Letter::kSoftSign) &&
+                soft_pair) {
+                if (result.transcription[sound_index].phoneme == Phoneme::kTs) {
+                    result.transcription[sound_index].phoneme = Phoneme::kT;
+                }
+                RecordPhenomenon(
+                    result, sound_index, PhoneticPhenomenon::kConsonantSoftening);
+                if (const auto softened =
+                        SoftPair(result.transcription[sound_index].phoneme)) {
+                    result.transcription[sound_index].phoneme = *softened;
+                }
+            }
+        }
+    }
+
+    FoldFullAffricates(result);
+    AssimilateFull(result);
+    return result;
 }
 
 std::optional<std::size_t> GetAccentInTranscription(

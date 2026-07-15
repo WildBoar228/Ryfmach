@@ -214,6 +214,25 @@ TEST(Sounds, FindsWhistlingAndHissingPairs) {
               ryfmach::bel::Phoneme::kCh);
 }
 
+TEST(Sounds, DescribesVowelsAndConsonantsInBelarusian) {
+    EXPECT_EQ(
+        ryfmach::bel::SoundDescription(
+            {.phoneme = ryfmach::bel::Phoneme::kA, .stressed = false}),
+        "галосны, ненаціскны");
+    EXPECT_EQ(
+        ryfmach::bel::SoundDescription(
+            {.phoneme = ryfmach::bel::Phoneme::kA, .stressed = true}),
+        "галосны, націскны");
+    EXPECT_EQ(
+        ryfmach::bel::SoundDescription(
+            {.phoneme = ryfmach::bel::Phoneme::kB, .stressed = false}),
+        "зычны, звонкі парны [п], цвёрды парны [б']");
+    EXPECT_EQ(
+        ryfmach::bel::SoundDescription(
+            {.phoneme = ryfmach::bel::Phoneme::kW, .stressed = false}),
+        "зычны, звонкі няпарны, цвёрды няпарны");
+}
+
 TEST(Transcription, MarksStressedVowelsWithoutSeparatePhonemes) {
     const auto transcription = ryfmach::bel::GetTranscriptionSounds("мама", 1);
 
@@ -252,6 +271,68 @@ TEST(Transcription, FoldsAffricates) {
     EXPECT_EQ((*transcription)[1].phoneme, ryfmach::bel::Phoneme::kE);
     EXPECT_TRUE((*transcription)[1].stressed);
     EXPECT_EQ((*transcription)[2].phoneme, ryfmach::bel::Phoneme::kNSoft);
+}
+
+TEST(Transcription, BuildsFullTranscriptionWithMappingsAndPhenomena) {
+    const auto full = ryfmach::bel::GetTranscriptionFull("вераб'і", 6);
+
+    ASSERT_TRUE(full.has_value());
+    const std::vector<std::vector<std::size_t>> expected_mapping = {
+        {0}, {1}, {2}, {3}, {4}, {}, {5, 6},
+    };
+    EXPECT_EQ(full->letter_to_sounds, expected_mapping);
+    EXPECT_EQ(JoinTranscription(full->transcription), "в' э р а б й _і_");
+
+    ASSERT_EQ(full->phenomena.size(), 2);
+    EXPECT_EQ(full->phenomena[0].sound_index, 0);
+    EXPECT_EQ(
+        full->phenomena[0].phenomenon,
+        ryfmach::bel::PhoneticPhenomenon::kConsonantSoftening);
+    EXPECT_EQ(
+        JoinTranscription(full->phenomena[0].transcription),
+        "в э р а б _і_");
+    EXPECT_EQ(full->phenomena[1].sound_index, 5);
+    EXPECT_EQ(
+        full->phenomena[1].phenomenon,
+        ryfmach::bel::PhoneticPhenomenon::kIotation);
+    EXPECT_EQ(
+        JoinTranscription(full->phenomena[1].transcription),
+        "в' э р а б _і_");
+}
+
+TEST(Transcription, RecordsFullAffricationAndAssimilation) {
+    const auto full = ryfmach::bel::GetTranscriptionFull("ксёндз", 2);
+
+    ASSERT_TRUE(full.has_value());
+    const std::vector<std::vector<std::size_t>> expected_mapping = {
+        {0}, {1}, {2}, {3}, {4}, {4},
+    };
+    EXPECT_EQ(full->letter_to_sounds, expected_mapping);
+    EXPECT_EQ(JoinTranscription(full->transcription), "к с' _о_ н ц");
+
+    ASSERT_EQ(full->phenomena.size(), 3);
+    EXPECT_EQ(
+        full->phenomena[0].phenomenon,
+        ryfmach::bel::PhoneticPhenomenon::kConsonantSoftening);
+    EXPECT_EQ(
+        full->phenomena[1].phenomenon,
+        ryfmach::bel::PhoneticPhenomenon::kAffricates);
+    EXPECT_EQ(
+        full->phenomena[2].phenomenon,
+        ryfmach::bel::PhoneticPhenomenon::kThudAssimilation);
+    EXPECT_EQ(full->phenomena[1].sound_index, 4);
+    EXPECT_EQ(full->phenomena[2].sound_index, 4);
+    EXPECT_EQ(
+        JoinTranscription(full->phenomena[2].transcription),
+        "к с' _о_ н дз");
+}
+
+TEST(Transcription, FullTranscriptionDoesNotIotateInitialI) {
+    const auto full = ryfmach::bel::GetTranscriptionFull("іва", 0);
+
+    ASSERT_TRUE(full.has_value());
+    EXPECT_TRUE(full->phenomena.empty());
+    EXPECT_EQ(JoinTranscription(full->transcription), "_і_ в а");
 }
 
 TEST(Transcription, RejectsAccentOnNonVowel) {
@@ -726,6 +807,47 @@ TEST(RyfmachService, FindsRhymesForManualAccentWithoutDictionaryLookup) {
     EXPECT_EQ(result.rhymes_list[0].word_variant.word, "ката");
     EXPECT_EQ(result.rhymes_list[0].word_variant.accent, 1);
     EXPECT_FALSE(result.rhymes_list[0].rhymes.empty());
+}
+
+TEST(RyfmachService, AnalyzesDictionaryWordPhonetics) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const ryfmach::app::RyfmachService service(slounik);
+
+    const auto result = service.AnalyzePhonetics("хата");
+
+    ASSERT_TRUE(result.word_found);
+    ASSERT_EQ(result.word_variants.size(), 1);
+    const auto& analysis = result.word_variants[0];
+    EXPECT_EQ(analysis.word_variant.id, 1);
+    EXPECT_EQ(JoinTranscription(analysis.transcription), "х _а_ т а");
+    EXPECT_EQ(
+        analysis.sound_analysis,
+        (std::vector<std::string>{
+            "зычны, глухі парны [г], цвёрды парны [х']",
+            "галосны, націскны",
+            "зычны, глухі парны [д], цвёрды парны [ц']",
+            "галосны, ненаціскны",
+        }));
+}
+
+TEST(RyfmachService, AnalyzesManualAccentPhonetics) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const ryfmach::app::RyfmachService service(slounik);
+
+    const auto result = service.AnalyzePhonetics("ксёндз", 2);
+
+    ASSERT_TRUE(result.word_found);
+    ASSERT_EQ(result.word_variants.size(), 1);
+    const auto& analysis = result.word_variants[0];
+    EXPECT_EQ(analysis.word_variant.id, 0);
+    EXPECT_EQ(JoinTranscription(analysis.transcription), "к с' _о_ н ц");
+    EXPECT_EQ(
+        analysis.letter_map[4].letters,
+        (std::vector<std::size_t>{4, 5}));
+    ASSERT_EQ(analysis.phenomena.size(), 3);
+    EXPECT_EQ(
+        analysis.phenomena[2].phenomenon,
+        ryfmach::bel::PhoneticPhenomenon::kThudAssimilation);
 }
 
 } // namespace
