@@ -809,6 +809,15 @@ TEST(RyfmachService, FindsRhymesForManualAccentWithoutDictionaryLookup) {
     EXPECT_FALSE(result.rhymes_list[0].rhymes.empty());
 }
 
+TEST(RyfmachService, RejectsInvalidInputBeforePhoneticsAndRhymes) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const ryfmach::app::RyfmachService service(slounik);
+
+    EXPECT_FALSE(service.FindRhymes("not Belarusian").word_found);
+    EXPECT_FALSE(service.AnalyzePhonetics("not Belarusian").word_found);
+    EXPECT_FALSE(service.FindRhymes("хата", 0).word_found);
+}
+
 TEST(RyfmachService, AnalyzesDictionaryWordPhonetics) {
     const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
     const ryfmach::app::RyfmachService service(slounik);

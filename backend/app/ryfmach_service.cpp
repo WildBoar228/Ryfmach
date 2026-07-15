@@ -7,7 +7,7 @@ namespace ryfmach::app {
 namespace {
 
 constexpr std::size_t kMaxRhymesPerVariant = 300;
-constexpr std::size_t kMaxPhoneticsWordLength = 40;
+constexpr std::size_t kMaxInputWordLength = 40;
 
 void ReplaceAll(
     std::string& text,
@@ -20,7 +20,7 @@ void ReplaceAll(
     }
 }
 
-std::string NormalizePhoneticsWord(std::string_view word) {
+std::string NormalizeInputWord(std::string_view word) {
     std::string normalized(word);
     ReplaceAll(normalized, "и", "і");
     ReplaceAll(normalized, "щ", "ў");
@@ -28,11 +28,11 @@ std::string NormalizePhoneticsWord(std::string_view word) {
     return normalized;
 }
 
-std::optional<std::vector<bel::Letter>> ParsePhoneticsWord(
+std::optional<std::vector<bel::Letter>> ParseInputWord(
     std::string_view word
 ) {
     const auto letters = bel::ParseWord(word);
-    if (!letters || letters->size() > kMaxPhoneticsWordLength) {
+    if (!letters || letters->size() > kMaxInputWordLength) {
         return std::nullopt;
     }
 
@@ -45,8 +45,13 @@ RyfmachService::RyfmachService(const bel::Slounik& slounik)
     : slounik_(slounik) {}
 
 RhymesResult RyfmachService::FindRhymes(std::string_view word) const {
+    const std::string normalized_word = NormalizeInputWord(word);
+    if (!ParseInputWord(normalized_word)) {
+        return {};
+    }
+
     const auto word_variants = slounik_.FindWords(
-        word,
+        normalized_word,
         bel::WordLookupOptions{.fix_similar_letters = true});
 
     RhymesResult result;
@@ -63,8 +68,14 @@ RhymesResult RyfmachService::FindRhymes(std::string_view word) const {
 RhymesResult RyfmachService::FindRhymes(
     std::string_view word,
     std::size_t accent) const {
+    const std::string normalized_word = NormalizeInputWord(word);
+    const auto letters = ParseInputWord(normalized_word);
+    if (!letters || accent >= letters->size() || !bel::IsVowel((*letters)[accent])) {
+        return {};
+    }
+
     bel::WordRecord word_variant{
-        .word = std::string(word),
+        .word = normalized_word,
         .accent = accent,
     };
 
@@ -75,8 +86,8 @@ RhymesResult RyfmachService::FindRhymes(
 }
 
 PhoneticsResult RyfmachService::AnalyzePhonetics(std::string_view word) const {
-    const std::string normalized_word = NormalizePhoneticsWord(word);
-    if (!ParsePhoneticsWord(normalized_word)) {
+    const std::string normalized_word = NormalizeInputWord(word);
+    if (!ParseInputWord(normalized_word)) {
         return {};
     }
 
@@ -100,12 +111,12 @@ PhoneticsResult RyfmachService::AnalyzePhonetics(
     std::size_t accent
 ) const {
     bel::WordRecord word_variant{
-        .word = NormalizePhoneticsWord(word),
+        .word = NormalizeInputWord(word),
         .accent = accent,
     };
 
     PhoneticsResult result;
-    if (!ParsePhoneticsWord(word_variant.word)) {
+    if (!ParseInputWord(word_variant.word)) {
         return result;
     }
     if (auto analysis = AnalyzePhoneticsForVariant(word_variant)) {
