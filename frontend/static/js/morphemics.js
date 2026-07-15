@@ -189,7 +189,7 @@ function post_sklad_request(){
     set_loading(true);
 
     $.ajax({
-        url: "/morphemics",
+        url: "/api/morphemics",
         method: "post",
         dataType: "json",
         contentType: "application/json",

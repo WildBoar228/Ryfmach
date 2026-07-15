@@ -3,6 +3,7 @@
 
 #include <SQLiteCpp/SQLiteCpp.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <limits>
 #include <mutex>
@@ -248,6 +249,56 @@ public:
         return words;
     }
 
+    std::vector<std::string> FindMorphemicAnalyses(
+        std::string_view word,
+        bool fix_similar_letters
+    ) const {
+        const auto variants = fix_similar_letters
+                                  ? SimilarLetterVariants(word, 5)
+                                  : std::vector<std::string>{std::string(word)};
+
+        std::lock_guard lock(mutex_);
+        SQLite::Statement query(
+            db_,
+            "SELECT * FROM morphemics WHERE word IN (" +
+                BuildPlaceholders(variants.size()) + ")");
+        for (std::size_t index = 0; index < variants.size(); ++index) {
+            query.bind(static_cast<int>(index + 1), variants[index]);
+        }
+
+        std::vector<std::string> analyses;
+        while (query.executeStep()) {
+            analyses.push_back(query.getColumn(2).getString());
+        }
+        return analyses;
+    }
+
+    std::vector<MorphemicPrefixRecord> GetMorphemicPrefixes() const {
+        std::lock_guard lock(mutex_);
+        if (morphemic_prefixes_) {
+            return *morphemic_prefixes_;
+        }
+
+        SQLite::Statement query(db_, "SELECT * FROM morph_prefixes");
+
+        std::vector<MorphemicPrefixRecord> prefixes;
+        while (query.executeStep()) {
+            prefixes.push_back(MorphemicPrefixRecord{
+                .text = query.getColumn(1).getString(),
+                .analysis = query.getColumn(2).getString(),
+            });
+        }
+        std::stable_sort(
+            prefixes.begin(),
+            prefixes.end(),
+            [](const MorphemicPrefixRecord& left,
+               const MorphemicPrefixRecord& right) {
+                return left.text.size() > right.text.size();
+            });
+        morphemic_prefixes_ = std::move(prefixes);
+        return *morphemic_prefixes_;
+    }
+
     std::vector<Rhyme> FindRhymesAdaptive(
         const WordRecord& input_word,
         const RhymeSearchFilters& filters,
@@ -444,6 +495,7 @@ private:
 
     SQLite::Database db_;
     mutable std::mutex mutex_;
+    mutable std::optional<std::vector<MorphemicPrefixRecord>> morphemic_prefixes_;
 };
 
 Slounik::Slounik() : Slounik(GetSlounikDbPathFromEnvironment()) {}
@@ -469,6 +521,17 @@ std::optional<WordRecord> Slounik::GetWordById(int id) const {
 
 std::vector<WordRecord> Slounik::GetWordForms(int initial_id) const {
     return impl_->GetWordForms(initial_id);
+}
+
+std::vector<std::string> Slounik::FindMorphemicAnalyses(
+    std::string_view word,
+    bool fix_similar_letters
+) const {
+    return impl_->FindMorphemicAnalyses(word, fix_similar_letters);
+}
+
+std::vector<MorphemicPrefixRecord> Slounik::GetMorphemicPrefixes() const {
+    return impl_->GetMorphemicPrefixes();
 }
 
 std::vector<Rhyme> Slounik::FindRhymes(

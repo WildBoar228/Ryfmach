@@ -109,6 +109,28 @@ json PhoneticsResultToJson(const PhoneticsResult& result) {
     };
 }
 
+json MorphemicsResultToJson(const MorphemicsResult& result) {
+    json variants = json::array();
+    for (const auto& variant : result.variants) {
+        json analysis = json::array();
+        for (const auto& morpheme : variant.analysis) {
+            analysis.push_back({
+                {"type", static_cast<int>(morpheme.type)},
+                {"text", morpheme.text},
+            });
+        }
+        variants.push_back({
+            {"analysis", std::move(analysis)},
+            {"sure", variant.sure},
+        });
+    }
+
+    return {
+        {"variants", std::move(variants)},
+        {"word_found", result.word_found},
+    };
+}
+
 void WriteJson(httplib::Response& res, int status, const json& body) {
     res.status = status;
     res.set_content(body.dump(), "application/json");
@@ -181,6 +203,33 @@ void HandlePhoneticsRequest(
     }
 }
 
+void HandleMorphemicsRequest(
+    const httplib::Request& req,
+    httplib::Response& res,
+    const RyfmachService& service) {
+    try {
+        const json request = json::parse(req.body);
+        if (!request.contains("word") || request.at("word").is_null()) {
+            WriteJson(
+                res,
+                200,
+                {{"variants", json::array()}, {"word_found", false}});
+            return;
+        }
+
+        const std::string word = request.at("word").get<std::string>();
+        WriteJson(res, 200, MorphemicsResultToJson(service.AnalyzeMorphemics(word)));
+    } catch (const json::exception&) {
+        WriteJson(
+            res,
+            400,
+            {{"error", "Request body must be JSON with a word string."}});
+    } catch (const std::exception& exception) {
+        std::cerr << "failed to analyze morphemics: " << exception.what() << '\n';
+        WriteJson(res, 500, {{"error", "Unable to analyze morphemics."}});
+    }
+}
+
 } // namespace
 
 RyfmachServer::RyfmachServer(const RyfmachService& service)
@@ -207,6 +256,12 @@ bool RyfmachServer::Listen(std::string_view host, int port) const {
         [this](const httplib::Request& req, httplib::Response& res) {
             std::cout << "/api/phonetics\n";
             HandlePhoneticsRequest(req, res, service_);
+        });
+
+    server.Post(
+        "/api/morphemics",
+        [this](const httplib::Request& req, httplib::Response& res) {
+            HandleMorphemicsRequest(req, res, service_);
         });
 
     return server.listen(std::string(host), port);

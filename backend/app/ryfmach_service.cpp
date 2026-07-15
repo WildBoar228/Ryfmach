@@ -126,6 +126,19 @@ PhoneticsResult RyfmachService::AnalyzePhonetics(
     return result;
 }
 
+MorphemicsResult RyfmachService::AnalyzeMorphemics(std::string_view word) const {
+    const std::string normalized_word = NormalizeInputWord(word);
+    if (!ParseInputWord(normalized_word)) {
+        return {};
+    }
+
+    bel::MorphemicAnalyzer analyzer(slounik_);
+    MorphemicsResult result;
+    result.variants = analyzer.Analyze(normalized_word);
+    result.word_found = !result.variants.empty();
+    return result;
+}
+
 RhymeGroup RyfmachService::FindRhymesForVariant(
     const bel::WordRecord& word_variant) const {
     RhymeGroup rhyme_group;

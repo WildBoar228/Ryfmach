@@ -76,6 +76,8 @@ std::filesystem::path CreateSlounikTestDatabase() {
     SQLite::Database db(path, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
     db.exec("DROP TABLE IF EXISTS words");
     db.exec("DROP TABLE IF EXISTS parts_of_speech");
+    db.exec("DROP TABLE IF EXISTS morphemics");
+    db.exec("DROP TABLE IF EXISTS morph_prefixes");
     db.exec(R"sql(
         CREATE TABLE parts_of_speech (
             id INTEGER PRIMARY KEY,
@@ -96,6 +98,21 @@ std::filesystem::path CreateSlounikTestDatabase() {
         )
     )sql");
     db.exec("INSERT INTO parts_of_speech (id, name) VALUES (1, 'назоўнік')");
+    db.exec(R"sql(
+        CREATE TABLE morphemics (
+            id INTEGER PRIMARY KEY,
+            word TEXT NOT NULL,
+            analysis TEXT NOT NULL
+        )
+    )sql");
+    db.exec(R"sql(
+        CREATE TABLE morph_prefixes (
+            id INTEGER PRIMARY KEY,
+            text TEXT NOT NULL,
+            analysis TEXT NOT NULL
+        )
+    )sql");
+    db.exec("INSERT INTO morphemics VALUES (1, 'хата', '(хат)-[а]')");
 
     const auto khata_hashes = SoundHashesFor("хата", 1);
     InsertWord(db, 1, "хата", 1, 1, 1, khata_hashes);
@@ -204,6 +221,23 @@ TEST(RyfmachService, AnalyzesManualAccentPhonetics) {
     EXPECT_EQ(
         analysis.phenomena[2].phenomenon,
         ryfmach::bel::PhoneticPhenomenon::kThudAssimilation);
+}
+
+TEST(RyfmachService, AnalyzesMorphemics) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const ryfmach::app::RyfmachService service(slounik);
+
+    const auto result = service.AnalyzeMorphemics("хата");
+
+    ASSERT_TRUE(result.word_found);
+    ASSERT_EQ(result.variants.size(), 1);
+    EXPECT_TRUE(result.variants[0].sure);
+    EXPECT_EQ(
+        result.variants[0].analysis,
+        (std::vector<ryfmach::bel::Morpheme>{
+            {.type = ryfmach::bel::MorphemeType::kRoot, .text = "хат"},
+            {.type = ryfmach::bel::MorphemeType::kEnding, .text = "а"},
+        }));
 }
 
 } // namespace

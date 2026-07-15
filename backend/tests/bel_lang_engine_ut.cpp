@@ -1,4 +1,5 @@
 #include "language.hpp"
+#include "morphemics.hpp"
 #include "rhymes.hpp"
 #include "slounik.hpp"
 #include "sounds.hpp"
@@ -88,6 +89,8 @@ std::filesystem::path CreateSlounikTestDatabase() {
     SQLite::Database db(path, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
     db.exec("DROP TABLE IF EXISTS words");
     db.exec("DROP TABLE IF EXISTS parts_of_speech");
+    db.exec("DROP TABLE IF EXISTS morphemics");
+    db.exec("DROP TABLE IF EXISTS morph_prefixes");
     db.exec(R"sql(
         CREATE TABLE parts_of_speech (
             id INTEGER PRIMARY KEY,
@@ -108,12 +111,32 @@ std::filesystem::path CreateSlounikTestDatabase() {
         )
     )sql");
     db.exec("INSERT INTO parts_of_speech (id, name) VALUES (1, 'назоўнік')");
+    db.exec(R"sql(
+        CREATE TABLE morphemics (
+            id INTEGER PRIMARY KEY,
+            word TEXT NOT NULL,
+            analysis TEXT NOT NULL
+        )
+    )sql");
+    db.exec(R"sql(
+        CREATE TABLE morph_prefixes (
+            id INTEGER PRIMARY KEY,
+            text TEXT NOT NULL,
+            analysis TEXT NOT NULL
+        )
+    )sql");
+    db.exec("INSERT INTO morphemics VALUES (1, 'хата', '(хат)-[а]')");
+    db.exec("INSERT INTO morphemics VALUES (2, 'ход', '(ход)-[]')");
+    db.exec("INSERT INTO morphemics VALUES (3, 'мыць', '(мы)-<ць>')");
+    db.exec("INSERT INTO morph_prefixes VALUES (1, 'пры', '|пры|')");
 
     const auto khata_hashes = SoundHashesFor("хата", 1);
     InsertWord(db, 1, "хата", 1, 1, 1, khata_hashes);
     InsertWord(db, 2, "хаце", 1, 1, 1, SoundHashesFor("хаце", 1));
     InsertWord(db, 3, "верас", 3, 1, 1, SoundHashesFor("верас", 1));
     InsertWord(db, 4, "дзень", 4, 1, 2, SoundHashesFor("дзень", 2));
+    InsertWord(db, 9, "гуляць", 9, 2, 3, SoundHashesFor("гуляць", 3));
+    InsertWord(db, 10, "мыцца", 10, 2, 4, SoundHashesFor("мыцца", 4));
 
     InsertWord(
         db, 5, "рата", 5, 1, 1,
@@ -221,6 +244,23 @@ TEST(Sounds, DescribesVowelsAndConsonantsInBelarusian) {
         ryfmach::bel::SoundDescription(
             {.phoneme = ryfmach::bel::Phoneme::kW, .stressed = false}),
         "зычны, звонкі няпарны, цвёрды няпарны");
+}
+
+TEST(Morphemics, DecodesAndEncodesStoredAnalysis) {
+    const auto analysis = ryfmach::bel::DecodeMorphemicAnalysis(
+        "|пры|-(ход)-<н>-[]");
+
+    EXPECT_EQ(
+        analysis,
+        (std::vector<ryfmach::bel::Morpheme>{
+            {.type = ryfmach::bel::MorphemeType::kPrefix, .text = "пры"},
+            {.type = ryfmach::bel::MorphemeType::kRoot, .text = "ход"},
+            {.type = ryfmach::bel::MorphemeType::kSuffix, .text = "н"},
+            {.type = ryfmach::bel::MorphemeType::kEnding, .text = ""},
+        }));
+    EXPECT_EQ(
+        ryfmach::bel::EncodeMorphemicAnalysis(analysis),
+        "|пры|-(ход)-<н>-[]");
 }
 
 TEST(Transcription, MarksStressedVowelsWithoutSeparatePhonemes) {
@@ -694,6 +734,77 @@ TEST(Slounik, GetsWordForms) {
     EXPECT_EQ(words[0].word, "хата");
     EXPECT_EQ(words[1].word, "хаце");
     EXPECT_EQ(words[1].initial_word, "хата");
+}
+
+TEST(Slounik, FindsStoredMorphemicAnalysesAndPrefixes) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+
+    EXPECT_EQ(
+        slounik.FindMorphemicAnalyses("хата"),
+        (std::vector<std::string>{"(хат)-[а]"}));
+    EXPECT_EQ(
+        slounik.GetMorphemicPrefixes(),
+        (std::vector<ryfmach::bel::MorphemicPrefixRecord>{
+            {.text = "пры", .analysis = "|пры|"},
+        }));
+}
+
+TEST(Morphemics, UsesStoredAnalysesAndPrefixPredictions) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const ryfmach::bel::MorphemicAnalyzer analyzer(slounik);
+
+    EXPECT_EQ(
+        analyzer.Analyze("хата"),
+        (std::vector<ryfmach::bel::MorphemicAnalysis>{
+            {
+                .analysis = {
+                    {.type = ryfmach::bel::MorphemeType::kRoot, .text = "хат"},
+                    {.type = ryfmach::bel::MorphemeType::kEnding, .text = "а"},
+                },
+                .sure = true,
+            },
+        }));
+    EXPECT_EQ(
+        analyzer.Analyze("прыход"),
+        (std::vector<ryfmach::bel::MorphemicAnalysis>{
+            {
+                .analysis = {
+                    {.type = ryfmach::bel::MorphemeType::kPrefix, .text = "пры"},
+                    {.type = ryfmach::bel::MorphemeType::kRoot, .text = "ход"},
+                    {.type = ryfmach::bel::MorphemeType::kEnding, .text = ""},
+                },
+                .sure = true,
+            },
+        }));
+}
+
+TEST(Morphemics, BuildsSureAndFallbackPredictions) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const ryfmach::bel::MorphemicAnalyzer analyzer(slounik);
+
+    EXPECT_EQ(
+        analyzer.Analyze("мыцца"),
+        (std::vector<ryfmach::bel::MorphemicAnalysis>{
+            {
+                .analysis = {
+                    {.type = ryfmach::bel::MorphemeType::kRoot, .text = "мы"},
+                    {.type = ryfmach::bel::MorphemeType::kSuffix, .text = "ц"},
+                    {.type = ryfmach::bel::MorphemeType::kSuffix, .text = "ца"},
+                },
+                .sure = true,
+            },
+        }));
+    EXPECT_EQ(
+        analyzer.Analyze("гуляць"),
+        (std::vector<ryfmach::bel::MorphemicAnalysis>{
+            {
+                .analysis = {
+                    {.type = ryfmach::bel::MorphemeType::kUnknown, .text = "гуля"},
+                    {.type = ryfmach::bel::MorphemeType::kSuffix, .text = "ць"},
+                },
+                .sure = false,
+            },
+        }));
 }
 
 TEST(Slounik, FindsIdealRhymesBySoundHash) {

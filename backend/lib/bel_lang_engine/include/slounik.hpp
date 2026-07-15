@@ -33,6 +33,15 @@ struct WordLookupOptions {
     std::size_t max_similar_letter_replacements = 5;
 };
 
+struct MorphemicPrefixRecord {
+    std::string text;
+    std::string analysis;
+
+    friend bool operator==(
+        const MorphemicPrefixRecord&,
+        const MorphemicPrefixRecord&) = default;
+};
+
 enum class SearchMistakeLevel {
     kAdaptive,
     kIdeal,
@@ -61,6 +70,10 @@ public:
         WordLookupOptions options = {}) const;
     std::optional<WordRecord> GetWordById(int id) const;
     std::vector<WordRecord> GetWordForms(int initial_id) const;
+    std::vector<std::string> FindMorphemicAnalyses(
+        std::string_view word,
+        bool fix_similar_letters = true) const;
+    std::vector<MorphemicPrefixRecord> GetMorphemicPrefixes() const;
 
     std::vector<Rhyme> FindRhymes(
         const WordRecord&,
