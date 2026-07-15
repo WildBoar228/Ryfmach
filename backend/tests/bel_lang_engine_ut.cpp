@@ -1,6 +1,5 @@
 #include "language.hpp"
 #include "rhymes.hpp"
-#include "ryfmach_service.hpp"
 #include "slounik.hpp"
 #include "sounds.hpp"
 #include "transcription.hpp"
@@ -78,15 +77,6 @@ std::vector<int> RhymeWordIds(std::span<const ryfmach::bel::Rhyme> rhymes) {
     ids.reserve(rhymes.size());
     for (const auto& rhyme : rhymes) {
         ids.push_back(rhyme.word_id);
-    }
-    return ids;
-}
-
-std::vector<int> WordIds(std::span<const ryfmach::bel::WordRecord> words) {
-    std::vector<int> ids;
-    ids.reserve(words.size());
-    for (const auto& word : words) {
-        ids.push_back(word.id);
     }
     return ids;
 }
@@ -779,84 +769,6 @@ TEST(Slounik, FindsAdaptiveRhymesAcrossMistakeLevels) {
         20);
 
     EXPECT_EQ(RhymeWordIds(rhymes), (std::vector<int>{5, 6, 7, 8}));
-}
-
-TEST(RyfmachService, FindsRhymesForEveryDictionaryWordVariant) {
-    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
-    const ryfmach::app::RyfmachService service(slounik);
-
-    const auto result = service.FindRhymes("хата");
-
-    ASSERT_TRUE(result.word_found);
-    ASSERT_EQ(result.rhymes_list.size(), 1);
-    EXPECT_EQ(result.rhymes_list[0].word_variant.id, 1);
-    EXPECT_EQ(
-        WordIds(result.rhymes_list[0].rhymes),
-        (std::vector<int>{5, 6, 7, 8}));
-}
-
-TEST(RyfmachService, FindsRhymesForManualAccentWithoutDictionaryLookup) {
-    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
-    const ryfmach::app::RyfmachService service(slounik);
-
-    const auto result = service.FindRhymes("ката", 1);
-
-    ASSERT_TRUE(result.word_found);
-    ASSERT_EQ(result.rhymes_list.size(), 1);
-    EXPECT_EQ(result.rhymes_list[0].word_variant.id, 0);
-    EXPECT_EQ(result.rhymes_list[0].word_variant.word, "ката");
-    EXPECT_EQ(result.rhymes_list[0].word_variant.accent, 1);
-    EXPECT_FALSE(result.rhymes_list[0].rhymes.empty());
-}
-
-TEST(RyfmachService, RejectsInvalidInputBeforePhoneticsAndRhymes) {
-    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
-    const ryfmach::app::RyfmachService service(slounik);
-
-    EXPECT_FALSE(service.FindRhymes("not Belarusian").word_found);
-    EXPECT_FALSE(service.AnalyzePhonetics("not Belarusian").word_found);
-    EXPECT_FALSE(service.FindRhymes("хата", 0).word_found);
-}
-
-TEST(RyfmachService, AnalyzesDictionaryWordPhonetics) {
-    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
-    const ryfmach::app::RyfmachService service(slounik);
-
-    const auto result = service.AnalyzePhonetics("хата");
-
-    ASSERT_TRUE(result.word_found);
-    ASSERT_EQ(result.word_variants.size(), 1);
-    const auto& analysis = result.word_variants[0];
-    EXPECT_EQ(analysis.word_variant.id, 1);
-    EXPECT_EQ(JoinTranscription(analysis.transcription), "х _а_ т а");
-    EXPECT_EQ(
-        analysis.sound_analysis,
-        (std::vector<std::string>{
-            "зычны, глухі парны [г], цвёрды парны [х']",
-            "галосны, націскны",
-            "зычны, глухі парны [д], цвёрды парны [ц']",
-            "галосны, ненаціскны",
-        }));
-}
-
-TEST(RyfmachService, AnalyzesManualAccentPhonetics) {
-    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
-    const ryfmach::app::RyfmachService service(slounik);
-
-    const auto result = service.AnalyzePhonetics("ксёндз", 2);
-
-    ASSERT_TRUE(result.word_found);
-    ASSERT_EQ(result.word_variants.size(), 1);
-    const auto& analysis = result.word_variants[0];
-    EXPECT_EQ(analysis.word_variant.id, 0);
-    EXPECT_EQ(JoinTranscription(analysis.transcription), "к с' _о_ н ц");
-    EXPECT_EQ(
-        analysis.letter_map[4].letters,
-        (std::vector<std::size_t>{4, 5}));
-    ASSERT_EQ(analysis.phenomena.size(), 3);
-    EXPECT_EQ(
-        analysis.phenomena[2].phenomenon,
-        ryfmach::bel::PhoneticPhenomenon::kThudAssimilation);
 }
 
 } // namespace

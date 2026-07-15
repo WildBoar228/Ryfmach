@@ -13,7 +13,8 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(
     ryfmach_tests
-    smoke_ut.cpp
+    bel_lang_engine_ut.cpp
+    ryfmach_service_ut.cpp
 )
 
 target_link_libraries(
