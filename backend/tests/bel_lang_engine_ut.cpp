@@ -1,5 +1,6 @@
 #include "language.hpp"
 #include "morphemics.hpp"
+#include "rhyme_likes.hpp"
 #include "rhymes.hpp"
 #include "slounik.hpp"
 #include "sounds.hpp"
@@ -896,6 +897,22 @@ TEST(Slounik, FindsAdaptiveRhymesAcrossMistakeLevels) {
         20);
 
     EXPECT_EQ(RhymeWordIds(rhymes), (std::vector<int>{5, 6, 7, 8}));
+}
+
+TEST(RhymeLikes, UpdatesOneScoreForEitherPairOrder) {
+    const auto path = std::filesystem::temp_directory_path() /
+                      "ryfmach_rhyme_likes_test.sqlite";
+    std::filesystem::remove(path);
+    ryfmach::bel::RhymeLikes rhyme_likes(path);
+
+    EXPECT_EQ(rhyme_likes.UpdateScore("alpha", 1, "beta", 2, 1), 1);
+    EXPECT_EQ(rhyme_likes.UpdateScore("beta", 2, "alpha", 1, -1), 0);
+    EXPECT_EQ(rhyme_likes.UpdateScore("alpha", 1, "beta", 2, 1), 1);
+
+    SQLite::Database db(path, SQLite::OPEN_READONLY);
+    SQLite::Statement count(db, "SELECT COUNT(*) FROM rhyme_likes");
+    ASSERT_TRUE(count.executeStep());
+    EXPECT_EQ(count.getColumn(0).getInt(), 1);
 }
 
 } // namespace

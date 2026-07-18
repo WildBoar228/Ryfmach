@@ -7,7 +7,7 @@ import sys
 import time
 from pathlib import Path
 
-import bel_lang_engine.ryfmach as ryfmach
+import py_bel_lang_engine.ryfmach as ryfmach
 
 
 def read_all_words() -> list:

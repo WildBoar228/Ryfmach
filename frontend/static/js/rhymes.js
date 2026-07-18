@@ -193,7 +193,7 @@ function handle_rhyme_like_click(event){
         return;
 
     const is_liked = button.classList.contains("is-liked");
-    const endpoint = is_liked ? "/rhyme/dislike" : "/rhyme/like";
+    const endpoint = is_liked ? "/api/rhyme/dislike" : "/api/rhyme/like";
 
     button.disabled = true;
     $.ajax({

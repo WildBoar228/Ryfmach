@@ -9,12 +9,12 @@ namespace ryfmach::app {
 
 class RyfmachServer {
 public:
-    explicit RyfmachServer(const RyfmachService& service);
+    explicit RyfmachServer(RyfmachService& service);
 
     bool Listen(std::string_view host, int port) const;
 
 private:
-    const RyfmachService& service_;
+    RyfmachService& service_;
 };
 
 } // namespace ryfmach::app

@@ -3,6 +3,7 @@
 
 #include "language.hpp"
 #include "morphemics.hpp"
+#include "rhyme_likes.hpp"
 #include "rhyme_ranking.hpp"
 #include "rhymes.hpp"
 #include "slounik.hpp"

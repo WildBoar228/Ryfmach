@@ -265,9 +265,57 @@ void HandleMorphemicsRequest(
     }
 }
 
+struct RhymeLikeWord {
+    std::string word;
+    std::size_t stress;
+};
+
+struct RhymeLikeRequest {
+    RhymeLikeWord target;
+    RhymeLikeWord rhyme;
+};
+
+RhymeLikeWord ParseRhymeLikeWord(const json& j) {
+    RhymeLikeWord liked_word;
+    liked_word.word = j.at("word").get<std::string>();
+    liked_word.stress = j.at("stress").get<int>();
+    if (liked_word.word.empty()) {
+        throw json::type_error::create(302, "rhyme words must not be empty", &j);
+    }
+    return liked_word;
+}
+
+RhymeLikeRequest ParseRhymeLikeRequest(const json& j) {
+    RhymeLikeRequest request;
+    request.target = ParseRhymeLikeWord(j.at("request"));
+    request.rhyme = ParseRhymeLikeWord(j.at("rhyme"));
+    return request;
+}
+
+void HandleRhymeLikeRequest(
+    const httplib::Request& req,
+    httplib::Response& res,
+    RyfmachService& service,
+    int delta) {
+    try {
+        RhymeLikeRequest parsed = ParseRhymeLikeRequest(json::parse(req.body));
+
+        WriteJson(res, 200, {{"score", service.UpdateRhymeLikeScore(
+            parsed.target.word, parsed.target.stress,
+            parsed.rhyme.word, parsed.rhyme.stress,
+            delta)}});
+    } catch (const json::exception& exception) {
+        std::cerr << "Invalid like payload: " << exception.what() << '\n';
+        WriteJson(res, 400, {{"error", "Invalid like payload"}});
+    } catch (const std::exception& exception) {
+        std::cerr << "failed to update rhyme score: " << exception.what() << '\n';
+        WriteJson(res, 500, {{"error", "Unable to update rhyme score."}});
+    }
+}
+
 } // namespace
 
-RyfmachServer::RyfmachServer(const RyfmachService& service)
+RyfmachServer::RyfmachServer(RyfmachService& service)
     : service_(service) {}
 
 bool RyfmachServer::Listen(std::string_view host, int port) const {
@@ -296,7 +344,22 @@ bool RyfmachServer::Listen(std::string_view host, int port) const {
     server.Post(
         "/api/morphemics",
         [this](const httplib::Request& req, httplib::Response& res) {
+            std::cout << "/api/morphemics\n";
             HandleMorphemicsRequest(req, res, service_);
+        });
+
+    server.Post(
+        "/api/rhyme/like",
+        [this](const httplib::Request& req, httplib::Response& res) {
+            std::cout << "/api/rhyme/like" << std::endl;
+            HandleRhymeLikeRequest(req, res, service_, 1);
+        });
+
+    server.Post(
+        "/api/rhyme/dislike",
+        [this](const httplib::Request& req, httplib::Response& res) {
+            std::cout << "/api/rhyme/dislike" << std::endl;
+            HandleRhymeLikeRequest(req, res, service_, -1);
         });
 
     return server.listen(std::string(host), port);

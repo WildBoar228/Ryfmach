@@ -14,6 +14,7 @@ add_library(
     bel_lang_engine
     ${BEL_LANG_SRC}/language.cpp
     ${BEL_LANG_SRC}/morphemics.cpp
+    ${BEL_LANG_SRC}/rhyme_likes.cpp
     ${BEL_LANG_SRC}/rhyme_ranking.cpp
     ${BEL_LANG_SRC}/rhymes.cpp
     ${BEL_LANG_SRC}/slounik.cpp

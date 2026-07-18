@@ -4,6 +4,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <string>
 
 namespace {
@@ -33,7 +34,8 @@ int GetPort() {
 
 int main() {
     ryfmach::bel::Slounik slounik;
-    ryfmach::app::RyfmachService service(slounik);
+    ryfmach::app::RyfmachService service(
+        slounik, std::make_unique<ryfmach::bel::RhymeLikes>());
     ryfmach::app::RyfmachServer server(service);
 
     std::string host = GetHostName();

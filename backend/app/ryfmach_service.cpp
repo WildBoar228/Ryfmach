@@ -1,6 +1,7 @@
 #include "ryfmach_service.hpp"
 
 #include <string>
+#include <stdexcept>
 #include <utility>
 
 namespace ryfmach::app {
@@ -41,8 +42,10 @@ std::optional<std::vector<bel::Letter>> ParseInputWord(
 
 } // namespace
 
-RyfmachService::RyfmachService(const bel::Slounik& slounik)
-    : slounik_(slounik) {}
+RyfmachService::RyfmachService(
+    const bel::Slounik& slounik,
+    std::unique_ptr<bel::RhymeLikes> rhyme_likes)
+    : slounik_(slounik), rhyme_likes_(std::move(rhyme_likes)) {}
 
 RhymesResult RyfmachService::FindRhymes(
     std::string_view word,
@@ -142,6 +145,19 @@ MorphemicsResult RyfmachService::AnalyzeMorphemics(std::string_view word) const 
     result.variants = analyzer.Analyze(normalized_word);
     result.word_found = !result.variants.empty();
     return result;
+}
+
+int RyfmachService::UpdateRhymeLikeScore(
+    std::string_view request_word,
+    int request_stress,
+    std::string_view rhyme_word,
+    int rhyme_stress,
+    int delta) {
+    if (!rhyme_likes_) {
+        throw std::logic_error("rhyme likes are not configured");
+    }
+    return rhyme_likes_->UpdateScore(
+        request_word, request_stress, rhyme_word, rhyme_stress, delta);
 }
 
 RhymeGroup RyfmachService::FindRhymesForVariant(

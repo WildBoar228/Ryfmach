@@ -2,10 +2,12 @@
 #define RYFMACH_APP_RYFMACH_SERVICE_HPP_
 
 #include "morphemics.hpp"
+#include "rhyme_likes.hpp"
 #include "slounik.hpp"
 #include "transcription.hpp"
 
 #include <cstddef>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -48,7 +50,9 @@ struct MorphemicsResult {
 
 class RyfmachService {
 public:
-    explicit RyfmachService(const bel::Slounik& slounik);
+    explicit RyfmachService(
+        const bel::Slounik& slounik,
+        std::unique_ptr<bel::RhymeLikes> rhyme_likes = nullptr);
 
     RhymesResult FindRhymes(
         std::string_view word,
@@ -62,6 +66,12 @@ public:
         std::string_view word,
         std::size_t accent) const;
     MorphemicsResult AnalyzeMorphemics(std::string_view word) const;
+    int UpdateRhymeLikeScore(
+        std::string_view request_word,
+        int request_stress,
+        std::string_view rhyme_word,
+        int rhyme_stress,
+        int delta);
 
 private:
     RhymeGroup FindRhymesForVariant(
@@ -71,6 +81,7 @@ private:
         const bel::WordRecord& word_variant) const;
 
     const bel::Slounik& slounik_;
+    std::unique_ptr<bel::RhymeLikes> rhyme_likes_;
 };
 
 } // namespace ryfmach::app
