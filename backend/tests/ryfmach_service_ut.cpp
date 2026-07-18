@@ -98,6 +98,7 @@ std::filesystem::path CreateSlounikTestDatabase() {
         )
     )sql");
     db.exec("INSERT INTO parts_of_speech (id, name) VALUES (1, 'назоўнік')");
+    db.exec("INSERT INTO parts_of_speech (id, name) VALUES (2, 'дзеяслоў')");
     db.exec(R"sql(
         CREATE TABLE morphemics (
             id INTEGER PRIMARY KEY,
@@ -121,7 +122,7 @@ std::filesystem::path CreateSlounikTestDatabase() {
     InsertWord(db, 4, "дзень", 4, 1, 2, SoundHashesFor("дзень", 2));
 
     InsertWord(
-        db, 5, "рата", 5, 1, 1,
+        db, 5, "рата", 5, 2, 1,
         {khata_hashes[0], 100001, 100002, 100003});
     InsertWord(
         db, 6, "хаты", 6, 1, 1,
@@ -149,7 +150,8 @@ TEST(RyfmachService, FindsRhymesForEveryDictionaryWordVariant) {
     const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
     const ryfmach::app::RyfmachService service(slounik);
 
-    const auto result = service.FindRhymes("хата");
+    const auto result = service.FindRhymes("хата",
+        ryfmach::bel::RhymeSearchFilters{});
 
     ASSERT_TRUE(result.word_found);
     ASSERT_EQ(result.rhymes_list.size(), 1);
@@ -159,11 +161,25 @@ TEST(RyfmachService, FindsRhymesForEveryDictionaryWordVariant) {
         (std::vector<int>{5, 6, 7, 8}));
 }
 
+TEST(RyfmachService, FiltersRhymesByPartOfSpeech) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const ryfmach::app::RyfmachService service(slounik);
+
+    const auto result = service.FindRhymes("хата", {
+        .part_of_speech = {false, true, false, false, false, false, false},
+    });
+
+    ASSERT_TRUE(result.word_found);
+    ASSERT_EQ(result.rhymes_list.size(), 1);
+    EXPECT_EQ(WordIds(result.rhymes_list[0].rhymes), std::vector<int>{5});
+}
+
 TEST(RyfmachService, FindsRhymesForManualAccentWithoutDictionaryLookup) {
     const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
     const ryfmach::app::RyfmachService service(slounik);
 
-    const auto result = service.FindRhymes("ката", 1);
+    const auto result = service.FindRhymes("ката", 1,
+        ryfmach::bel::RhymeSearchFilters{});
 
     ASSERT_TRUE(result.word_found);
     ASSERT_EQ(result.rhymes_list.size(), 1);
@@ -177,9 +193,14 @@ TEST(RyfmachService, RejectsInvalidInputBeforePhoneticsAndRhymes) {
     const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
     const ryfmach::app::RyfmachService service(slounik);
 
-    EXPECT_FALSE(service.FindRhymes("not Belarusian").word_found);
-    EXPECT_FALSE(service.AnalyzePhonetics("not Belarusian").word_found);
-    EXPECT_FALSE(service.FindRhymes("хата", 0).word_found);
+    EXPECT_FALSE(
+        service.FindRhymes(
+            "not Belarusian", ryfmach::bel::RhymeSearchFilters{}
+        ).word_found);
+    EXPECT_FALSE(
+        service.AnalyzePhonetics("not Belarusian").word_found);
+    EXPECT_FALSE(service.FindRhymes("хата", 0,
+        ryfmach::bel::RhymeSearchFilters{}).word_found);
 }
 
 TEST(RyfmachService, AnalyzesDictionaryWordPhonetics) {

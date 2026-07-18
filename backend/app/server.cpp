@@ -14,6 +14,38 @@ namespace {
 
 using json = nlohmann::json;
 
+ryfmach::bel::RhymeSearchFilters FiltersFromJson(const json& j) {
+    using namespace ryfmach::bel;
+    RhymeSearchFilters filters;
+
+    int mistake_id = j.value("search_mistake", -1);
+    switch (mistake_id) {
+        case -1: filters.mistake = SearchMistakeLevel::kAdaptive; break;
+        case 0:  filters.mistake = SearchMistakeLevel::kIdeal; break;
+        case 1:  filters.mistake = SearchMistakeLevel::kGood; break;
+        case 2:  filters.mistake = SearchMistakeLevel::kMedium; break;
+        case 3:  filters.mistake = SearchMistakeLevel::kWeak; break;
+    }
+
+    filters.only_initial = j.value("only_initial", false);
+    if (j.contains("filtered_posp")) {
+        const json& part_of_speech = j.at("filtered_posp");
+        if (!part_of_speech.is_array() ||
+            part_of_speech.size() != filters.part_of_speech.size()) {
+            throw json::type_error::create(
+                302,
+                "filtered_posp must be an array of 7 booleans",
+                &part_of_speech);
+        }
+        for (std::size_t index = 0; index < filters.part_of_speech.size();
+             ++index) {
+            filters.part_of_speech[index] = part_of_speech.at(index).get<bool>();
+        }
+    }
+
+    return filters;
+}
+
 json WordRecordToJson(const bel::WordRecord& word) {
     if (word.id == 0) {
         return {
@@ -150,12 +182,15 @@ void HandleRhymesRequest(
                 {{"rhymes_list", json::array()}, {"word_found", false}});
             return;
         }
+        ryfmach::bel::RhymeSearchFilters filters = FiltersFromJson(request);
 
         if (request.contains("accent")) {
             const std::size_t accent = request.at("accent").get<std::size_t>();
-            WriteJson(res, 200, RhymesResultToJson(service.FindRhymes(word, accent)));
+            WriteJson(res, 200,
+                RhymesResultToJson(service.FindRhymes(word, accent, filters)));
         } else {
-            WriteJson(res, 200, RhymesResultToJson(service.FindRhymes(word)));
+            WriteJson(res, 200,
+                RhymesResultToJson(service.FindRhymes(word, filters)));
         }
     } catch (const json::exception&) {
         WriteJson(

@@ -111,6 +111,7 @@ std::filesystem::path CreateSlounikTestDatabase() {
         )
     )sql");
     db.exec("INSERT INTO parts_of_speech (id, name) VALUES (1, 'назоўнік')");
+    db.exec("INSERT INTO parts_of_speech (id, name) VALUES (2, 'дзеяслоў')");
     db.exec(R"sql(
         CREATE TABLE morphemics (
             id INTEGER PRIMARY KEY,
@@ -139,7 +140,7 @@ std::filesystem::path CreateSlounikTestDatabase() {
     InsertWord(db, 10, "мыцца", 10, 2, 4, SoundHashesFor("мыцца", 4));
 
     InsertWord(
-        db, 5, "рата", 5, 1, 1,
+        db, 5, "рата", 5, 2, 1,
         {khata_hashes[0], 100001, 100002, 100003});
     InsertWord(
         db, 6, "хаты", 6, 1, 1,
@@ -815,9 +816,24 @@ TEST(Slounik, FindsIdealRhymesBySoundHash) {
     const auto rhymes = slounik.FindRhymes(
         input_word->word,
         input_word->accent,
-        ryfmach::bel::SearchMistakeLevel::kIdeal,
-        ryfmach::bel::RhymeSearchFilters{},
+        ryfmach::bel::RhymeSearchFilters{
+            ryfmach::bel::SearchMistakeLevel::kIdeal},
         20);
+
+    EXPECT_EQ(RhymeWordIds(rhymes), std::vector<int>{5});
+}
+
+TEST(Slounik, FiltersRhymesByPartOfSpeech) {
+    const ryfmach::bel::Slounik slounik(CreateSlounikTestDatabase());
+    const auto input_word = slounik.GetWordById(1);
+    ASSERT_TRUE(input_word.has_value());
+
+    const ryfmach::bel::RhymeSearchFilters filters{
+        .mistake = ryfmach::bel::SearchMistakeLevel::kIdeal,
+        .part_of_speech = {false, true, false, false, false, false, false},
+    };
+    const auto rhymes = slounik.FindRhymes(
+        input_word->word, input_word->accent, filters, 20);
 
     EXPECT_EQ(RhymeWordIds(rhymes), std::vector<int>{5});
 }
@@ -830,8 +846,8 @@ TEST(Slounik, FindsGoodRhymesBySoundHash) {
     const auto rhymes = slounik.FindRhymes(
         input_word->word,
         input_word->accent,
-        ryfmach::bel::SearchMistakeLevel::kGood,
-        ryfmach::bel::RhymeSearchFilters{},
+        ryfmach::bel::RhymeSearchFilters{
+            ryfmach::bel::SearchMistakeLevel::kGood},
         20);
 
     EXPECT_EQ(RhymeWordIds(rhymes), std::vector<int>{6});
@@ -845,8 +861,8 @@ TEST(Slounik, FindsMediumRhymesBySoundHash) {
     const auto rhymes = slounik.FindRhymes(
         input_word->word,
         input_word->accent,
-        ryfmach::bel::SearchMistakeLevel::kMedium,
-        ryfmach::bel::RhymeSearchFilters{},
+        ryfmach::bel::RhymeSearchFilters{
+            ryfmach::bel::SearchMistakeLevel::kMedium},
         20);
 
     EXPECT_EQ(RhymeWordIds(rhymes), std::vector<int>{7});
@@ -860,8 +876,8 @@ TEST(Slounik, FindsWeakRhymesBySoundHash) {
     const auto rhymes = slounik.FindRhymes(
         input_word->word,
         input_word->accent,
-        ryfmach::bel::SearchMistakeLevel::kWeak,
-        ryfmach::bel::RhymeSearchFilters{},
+        ryfmach::bel::RhymeSearchFilters{
+            ryfmach::bel::SearchMistakeLevel::kWeak},
         20);
 
     EXPECT_EQ(RhymeWordIds(rhymes), std::vector<int>{8});
@@ -875,8 +891,8 @@ TEST(Slounik, FindsAdaptiveRhymesAcrossMistakeLevels) {
     const auto rhymes = slounik.FindRhymes(
         input_word->word,
         input_word->accent,
-        ryfmach::bel::SearchMistakeLevel::kAdaptive,
-        ryfmach::bel::RhymeSearchFilters{},
+        ryfmach::bel::RhymeSearchFilters{
+            ryfmach::bel::SearchMistakeLevel::kAdaptive},
         20);
 
     EXPECT_EQ(RhymeWordIds(rhymes), (std::vector<int>{5, 6, 7, 8}));

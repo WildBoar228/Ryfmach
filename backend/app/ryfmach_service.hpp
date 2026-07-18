@@ -50,8 +50,13 @@ class RyfmachService {
 public:
     explicit RyfmachService(const bel::Slounik& slounik);
 
-    RhymesResult FindRhymes(std::string_view word) const;
-    RhymesResult FindRhymes(std::string_view word, std::size_t accent) const;
+    RhymesResult FindRhymes(
+        std::string_view word,
+        const bel::RhymeSearchFilters&) const;
+    RhymesResult FindRhymes(
+        std::string_view word,
+        std::size_t accent,
+        const bel::RhymeSearchFilters&) const;
     PhoneticsResult AnalyzePhonetics(std::string_view word) const;
     PhoneticsResult AnalyzePhonetics(
         std::string_view word,
@@ -59,7 +64,9 @@ public:
     MorphemicsResult AnalyzeMorphemics(std::string_view word) const;
 
 private:
-    RhymeGroup FindRhymesForVariant(const bel::WordRecord& word_variant) const;
+    RhymeGroup FindRhymesForVariant(
+        const bel::WordRecord& word_variant,
+        const bel::RhymeSearchFilters&) const;
     std::optional<PhoneticAnalysis> AnalyzePhoneticsForVariant(
         const bel::WordRecord& word_variant) const;
 

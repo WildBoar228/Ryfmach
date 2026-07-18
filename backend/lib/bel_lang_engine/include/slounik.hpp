@@ -3,6 +3,7 @@
 
 #include "rhyme_ranking.hpp"
 
+#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <memory>
@@ -51,7 +52,10 @@ enum class SearchMistakeLevel {
 };
 
 struct RhymeSearchFilters {
-    // TODO
+    SearchMistakeLevel mistake = SearchMistakeLevel::kAdaptive;
+    bool only_initial = false;
+    std::array<bool, 7> part_of_speech = 
+        {true, true, true, true, true, true, true};
 };
 
 class Slounik {
@@ -68,16 +72,19 @@ public:
     std::vector<WordRecord> FindWords(
         std::string_view word,
         WordLookupOptions options = {}) const;
+
     std::optional<WordRecord> GetWordById(int id) const;
+
     std::vector<WordRecord> GetWordForms(int initial_id) const;
+
     std::vector<std::string> FindMorphemicAnalyses(
         std::string_view word,
         bool fix_similar_letters = true) const;
+
     std::vector<MorphemicPrefixRecord> GetMorphemicPrefixes() const;
 
     std::vector<Rhyme> FindRhymes(
         const WordRecord&,
-        SearchMistakeLevel,
         const RhymeSearchFilters&,
         std::size_t max_cnt
     ) const;
@@ -85,7 +92,6 @@ public:
     std::vector<Rhyme> FindRhymes(
         std::string_view word,
         std::size_t accent,
-        SearchMistakeLevel,
         const RhymeSearchFilters&,
         std::size_t max_cnt
     ) const;

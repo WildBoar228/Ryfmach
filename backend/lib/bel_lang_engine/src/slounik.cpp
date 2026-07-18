@@ -451,6 +451,7 @@ private:
             WordRecordSelectSql() +
             "WHERE w.word != ? AND " +
             BuildSoundHashFilter(mistake) + 
+            BuildRhymeFilter(filters) +
             R"sql(
                 ORDER BY w.word, w.initial_id, w.accent_index
                 LIMIT ?;
@@ -491,6 +492,37 @@ private:
                         w.sound_hash2 != ? AND w.sound_hash3 == ?)";
         }
         return "";
+    }
+
+    std::string BuildRhymeFilter(const RhymeSearchFilters& filters) const {
+        std::string result;
+        if (filters.only_initial) {
+            result += " AND w.id == w.initial_id ";
+        }
+
+        const bool has_selected_part_of_speech = std::ranges::any_of(
+            filters.part_of_speech, [](bool selected) { return selected; });
+        const bool has_unselected_part_of_speech = std::ranges::any_of(
+            filters.part_of_speech, [](bool selected) { return !selected; });
+        if (!has_selected_part_of_speech || !has_unselected_part_of_speech) {
+            return result;
+        }
+
+        result += " AND w.part_of_speech IN (";
+        bool first = true;
+        for (std::size_t index = 0; index < filters.part_of_speech.size();
+             ++index) {
+            if (!filters.part_of_speech[index]) {
+                continue;
+            }
+            if (!first) {
+                result += ", ";
+            }
+            result += std::to_string(index + 1);
+            first = false;
+        }
+        result += ") ";
+        return result;
     }
 
     SQLite::Database db_;
@@ -536,12 +568,11 @@ std::vector<MorphemicPrefixRecord> Slounik::GetMorphemicPrefixes() const {
 
 std::vector<Rhyme> Slounik::FindRhymes(
     const WordRecord& input_word,
-    SearchMistakeLevel mistake,
     const RhymeSearchFilters& filters,
     std::size_t max_cnt
 ) const {
     RhymeMistakeLevel rhyme_mistake;
-    switch (mistake) {
+    switch (filters.mistake) {
         case SearchMistakeLevel::kAdaptive:
             return impl_->FindRhymesAdaptive(
                 input_word,
@@ -572,7 +603,6 @@ std::vector<Rhyme> Slounik::FindRhymes(
 std::vector<Rhyme> Slounik::FindRhymes(
     std::string_view word,
     std::size_t accent,
-    SearchMistakeLevel mistake,
     const RhymeSearchFilters& filters,
     std::size_t max_cnt
 ) const {
@@ -581,7 +611,7 @@ std::vector<Rhyme> Slounik::FindRhymes(
         .accent = accent,
     };
 
-    return FindRhymes(input_word, mistake, filters, max_cnt);
+    return FindRhymes(input_word, filters, max_cnt);
 }
 
 } // namespace ryfmach::bel

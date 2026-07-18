@@ -44,7 +44,10 @@ std::optional<std::vector<bel::Letter>> ParseInputWord(
 RyfmachService::RyfmachService(const bel::Slounik& slounik)
     : slounik_(slounik) {}
 
-RhymesResult RyfmachService::FindRhymes(std::string_view word) const {
+RhymesResult RyfmachService::FindRhymes(
+    std::string_view word,
+    const bel::RhymeSearchFilters& filters
+) const {
     const std::string normalized_word = NormalizeInputWord(word);
     if (!ParseInputWord(normalized_word)) {
         return {};
@@ -59,7 +62,7 @@ RhymesResult RyfmachService::FindRhymes(std::string_view word) const {
     result.rhymes_list.reserve(word_variants.size());
 
     for (const auto& word_variant : word_variants) {
-        result.rhymes_list.push_back(FindRhymesForVariant(word_variant));
+        result.rhymes_list.push_back(FindRhymesForVariant(word_variant, filters));
     }
 
     return result;
@@ -67,7 +70,9 @@ RhymesResult RyfmachService::FindRhymes(std::string_view word) const {
 
 RhymesResult RyfmachService::FindRhymes(
     std::string_view word,
-    std::size_t accent) const {
+    std::size_t accent,
+    const bel::RhymeSearchFilters& filters
+) const {
     const std::string normalized_word = NormalizeInputWord(word);
     const auto letters = ParseInputWord(normalized_word);
     if (!letters || accent >= letters->size() || !bel::IsVowel((*letters)[accent])) {
@@ -81,7 +86,7 @@ RhymesResult RyfmachService::FindRhymes(
 
     RhymesResult result;
     result.word_found = true;
-    result.rhymes_list.push_back(FindRhymesForVariant(word_variant));
+    result.rhymes_list.push_back(FindRhymesForVariant(word_variant, filters));
     return result;
 }
 
@@ -140,15 +145,16 @@ MorphemicsResult RyfmachService::AnalyzeMorphemics(std::string_view word) const 
 }
 
 RhymeGroup RyfmachService::FindRhymesForVariant(
-    const bel::WordRecord& word_variant) const {
+    const bel::WordRecord& word_variant,
+    const bel::RhymeSearchFilters& filters
+) const {
     RhymeGroup rhyme_group;
     rhyme_group.word_variant = word_variant;
 
     const auto rhymes = slounik_.FindRhymes(
         word_variant.word,
         word_variant.accent,
-        bel::SearchMistakeLevel::kAdaptive,
-        bel::RhymeSearchFilters{},
+        filters,
         kMaxRhymesPerVariant);
     rhyme_group.rhymes.reserve(rhymes.size());
 
