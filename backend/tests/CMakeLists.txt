@@ -13,7 +13,11 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(
     ryfmach_tests
-    bel_lang_engine_ut.cpp
+    bel_lang_engine/core_ut.cpp
+    bel_lang_engine/morphemic_ut.cpp
+    bel_lang_engine/phonetic_ut.cpp
+    bel_lang_engine/rhyme_ut.cpp
+    bel_lang_engine/slounik_ut.cpp
     ryfmach_service_ut.cpp
 )
 
