@@ -202,6 +202,14 @@ std::string_view Spelling(Letter letter) noexcept {
     return "";
 }
 
+std::string StringifyWord(std::span<const Letter> letters) noexcept {
+    std::string word;
+    for (auto let : letters) {
+        word += Spelling(let);
+    }
+    return word;
+}
+
 std::string_view PhonemeSpelling(Phoneme phoneme) noexcept {
     switch (phoneme) {
         case Phoneme::kA:

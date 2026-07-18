@@ -46,7 +46,7 @@ namespace ryfmach::bel {
             auto rhyme_transcript = GetTranscriptionSounds(rhyme->letters, rhyme->stress);
             if (!rhyme_transcript) { continue; }
 
-            rhyme->score = CalcRhymeCost(
+            rhyme->cost = CalcRhymeCost(
                 *target_transript,
                 *rhyme_transcript,
                 kDefaultMaxShift);
@@ -59,8 +59,8 @@ namespace ryfmach::bel {
     void SortRhymes(std::vector<Rhyme>& rhymes) {
         std::sort(rhymes.begin(), rhymes.end(),
             [](const Rhyme& lhs, const Rhyme& rhs) {
-                return std::tie(lhs.score, lhs.penalty) <
-                       std::tie(rhs.score, rhs.penalty);
+                return std::tie(lhs.cost, lhs.penalty) <
+                       std::tie(rhs.cost, rhs.penalty);
             });
     }
     

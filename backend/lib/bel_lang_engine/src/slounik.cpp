@@ -5,9 +5,11 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <iostream>
 #include <limits>
 #include <mutex>
 #include <stdexcept>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 
@@ -306,6 +308,9 @@ public:
         std::size_t max_cnt
     ) const {
         std::vector<Rhyme> rhymes;
+        std::unordered_map<uint64_t, RhymeCostType> best_costs;
+        size_t final_cnt = 0;
+
         for (auto iter_mistake : {RhymeMistakeLevel::kIdeal,
                                   RhymeMistakeLevel::kGood,
                                   RhymeMistakeLevel::kMedium,
@@ -318,16 +323,22 @@ public:
             std::vector<Rhyme> new_rhymes = WordsToRhymesWithScore(
                 input_word,
                 std::move(new_candidates));
+
+            final_cnt += SaveRhymeWordFamilyLeaders(new_rhymes, best_costs);
             
             rhymes.insert(
                 rhymes.end(),
                 std::make_move_iterator(new_rhymes.begin()),
                 std::make_move_iterator(new_rhymes.end()));
 
-            if (rhymes.size() >= min_adaptive_cnt) {
+            if (final_cnt >= min_adaptive_cnt) {
                 break;
             }
         }
+
+        final_cnt = CleanRhymeWordFamilies(rhymes, best_costs);
+        rhymes.resize(final_cnt);
+
         return rhymes;
     }
 
@@ -342,7 +353,13 @@ public:
         std::vector<Rhyme> rhymes = WordsToRhymesWithScore(
             input_word,
             std::move(candidates));
+
+        std::unordered_map<uint64_t, RhymeCostType> best_costs;
+        (void)SaveRhymeWordFamilyLeaders(rhymes, best_costs);
+        std::size_t new_size = CleanRhymeWordFamilies(rhymes, best_costs);
+
         SortRhymes(rhymes);
+
         return rhymes;
     }
 
@@ -422,16 +439,39 @@ private:
         return word;
     }
 
-    std::size_t FilterRhymesByInitial(
+    std::size_t SaveRhymeWordFamilyLeaders(
+        std::span<const Rhyme> rhymes,
+        std::unordered_map<std::uint64_t, RhymeCostType>& best_family_words
+    ) const {
+        std::size_t k = 0;
+        for (std::size_t i = 0; i < rhymes.size(); ++i) {
+            const Rhyme& rhyme = rhymes[i];
+            auto iter = best_family_words.find(rhyme.initial_id);
+            if (iter == best_family_words.end()) {
+                best_family_words.emplace(rhyme.initial_id, rhyme.cost);
+                ++k;
+            } else {
+                if (iter->second > rhyme.cost) {
+                    iter->second = rhyme.cost;
+                }
+            }
+        }
+        return k;
+    }
+
+    std::size_t CleanRhymeWordFamilies(
         std::span<Rhyme> rhymes,
-        std::unordered_set<std::uint64_t>& initial_ids
+        std::unordered_map<std::uint64_t, RhymeCostType>& best_family_words
     ) const {
         std::size_t k = 0;
         for (std::size_t i = 0; i < rhymes.size(); ++i) {
             Rhyme& rhyme = rhymes[i];
-            if (!initial_ids.contains(rhyme.initial_id)) {
-                initial_ids.insert(rhyme.initial_id);
-                rhymes[k] = std::move(rhyme);
+            auto it = best_family_words.find(rhyme.initial_id);
+            if (it != best_family_words.end() && rhyme.cost == it->second) {
+                if (k != i) {
+                    rhymes[k] = std::move(rhyme);
+                }
+                best_family_words.erase(it);
                 ++k;
             }
         }

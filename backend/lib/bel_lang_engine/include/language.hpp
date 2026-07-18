@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -104,6 +105,8 @@ struct ParsedLetter {
 std::span<const Letter> Alphabet() noexcept;
 
 std::string_view Spelling(Letter letter) noexcept;
+std::string StringifyWord(std::span<const Letter>) noexcept;
+
 std::string_view PhonemeSpelling(Phoneme phoneme) noexcept;
 
 std::optional<ParsedLetter> ParseLetterPrefix(std::string_view text) noexcept;

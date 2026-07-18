@@ -20,7 +20,7 @@ struct Rhyme {
     std::size_t stress = 0;
     bool is_initial = false;
 
-    RhymeCostType score{};
+    RhymeCostType cost{};
     double penalty = 0;
 };
 
