@@ -13,10 +13,10 @@
 #include <vector>
 
 namespace {
+using ryfmach::app::RhymeResolutionStatus;
 using ryfmach::tests::JoinTranscription;
 using ryfmach::tests::SharedSlounikTestDatabasePath;
 using ryfmach::tests::WordIds;
-using ryfmach::app::RhymeResolutionStatus;
 
 TEST(RyfmachService, ResolvesOneExactPronunciationAndFindsRhymes) {
     const ryfmach::bel::Slounik slounik(SharedSlounikTestDatabasePath());
@@ -27,27 +27,29 @@ TEST(RyfmachService, ResolvesOneExactPronunciationAndFindsRhymes) {
 
     ASSERT_EQ(result.status, RhymeResolutionStatus::kResolved);
     ASSERT_TRUE(result.selected_variant.has_value());
-    EXPECT_EQ(result.selected_variant->word, "хата");
-    EXPECT_EQ(result.selected_variant->accent, 1);
-    ASSERT_EQ(result.selected_variant->dictionary_entries.size(), 1);
-    EXPECT_EQ(result.selected_variant->dictionary_entries[0].id, 1);
+    EXPECT_EQ(result.selected_variant->dictionary_entry.word, "хата");
+    EXPECT_EQ(result.selected_variant->dictionary_entry.accent, 1);
+    EXPECT_EQ(result.selected_variant->dictionary_entry.id, 1);
     EXPECT_EQ(WordIds(result.rhymes), (std::vector<int>{5, 6, 7, 8}));
 }
 
-TEST(RyfmachService, GroupsDictionaryEntriesByWordAndAccent) {
+TEST(RyfmachService, KeepsDistinctDictionaryWordsWithSamePronunciation) {
     const ryfmach::bel::Slounik slounik(SharedSlounikTestDatabasePath());
     const ryfmach::app::RyfmachService service(slounik);
 
     const auto result = service.FindRhymes(
         "ласка", ryfmach::bel::RhymeSearchFilters{});
 
-    ASSERT_EQ(result.status, RhymeResolutionStatus::kResolved);
-    ASSERT_TRUE(result.selected_variant.has_value());
-    EXPECT_EQ(result.selected_variant->word, "ласка");
-    EXPECT_EQ(result.selected_variant->accent, 1);
-    EXPECT_EQ(
-        WordIds(result.selected_variant->dictionary_entries),
-        (std::vector<int>{11, 12}));
+    ASSERT_EQ(result.status, RhymeResolutionStatus::kNeedsChoice);
+    ASSERT_EQ(result.variants.size(), 2);
+    EXPECT_EQ(result.variants[0].dictionary_entry.id, 11);
+    EXPECT_EQ(result.variants[0].dictionary_entry.word, "ласка");
+    EXPECT_EQ(result.variants[0].dictionary_entry.accent, 1);
+    EXPECT_EQ(result.variants[1].dictionary_entry.id, 12);
+    EXPECT_EQ(result.variants[1].dictionary_entry.word, "ласка");
+    EXPECT_EQ(result.variants[1].dictionary_entry.accent, 1);
+    EXPECT_FALSE(result.selected_variant.has_value());
+    EXPECT_TRUE(result.rhymes.empty());
 }
 
 TEST(RyfmachService, RequiresChoiceForMultipleExactStressVariants) {
@@ -59,11 +61,11 @@ TEST(RyfmachService, RequiresChoiceForMultipleExactStressVariants) {
 
     ASSERT_EQ(result.status, RhymeResolutionStatus::kNeedsChoice);
     ASSERT_EQ(result.variants.size(), 2);
-    EXPECT_EQ(result.variants[0].word, "замкі");
-    EXPECT_EQ(result.variants[0].accent, 1);
+    EXPECT_EQ(result.variants[0].dictionary_entry.word, "замкі");
+    EXPECT_EQ(result.variants[0].dictionary_entry.accent, 1);
     EXPECT_TRUE(result.variants[0].exact_match);
-    EXPECT_EQ(result.variants[1].word, "замкі");
-    EXPECT_EQ(result.variants[1].accent, 4);
+    EXPECT_EQ(result.variants[1].dictionary_entry.word, "замкі");
+    EXPECT_EQ(result.variants[1].dictionary_entry.accent, 4);
     EXPECT_TRUE(result.variants[1].exact_match);
     EXPECT_FALSE(result.selected_variant.has_value());
     EXPECT_TRUE(result.rhymes.empty());
@@ -78,13 +80,13 @@ TEST(RyfmachService, OrdersExactPronunciationsBeforeCorrections) {
 
     ASSERT_EQ(result.status, RhymeResolutionStatus::kNeedsChoice);
     ASSERT_EQ(result.variants.size(), 4);
-    EXPECT_EQ(result.variants[0].word, "мўка");
+    EXPECT_EQ(result.variants[0].dictionary_entry.word, "мўка");
     EXPECT_TRUE(result.variants[0].exact_match);
-    EXPECT_EQ(result.variants[1].word, "мўка");
+    EXPECT_EQ(result.variants[1].dictionary_entry.word, "мўка");
     EXPECT_TRUE(result.variants[1].exact_match);
-    EXPECT_EQ(result.variants[2].word, "мука");
+    EXPECT_EQ(result.variants[2].dictionary_entry.word, "мука");
     EXPECT_FALSE(result.variants[2].exact_match);
-    EXPECT_EQ(result.variants[3].word, "мука");
+    EXPECT_EQ(result.variants[3].dictionary_entry.word, "мука");
     EXPECT_FALSE(result.variants[3].exact_match);
     EXPECT_TRUE(result.rhymes.empty());
 }
@@ -98,7 +100,8 @@ TEST(RyfmachService, RequiresConfirmationForCorrectedOnlyPronunciation) {
 
     ASSERT_EQ(result.status, RhymeResolutionStatus::kNeedsChoice);
     ASSERT_EQ(result.variants.size(), 1);
-    EXPECT_EQ(result.variants[0].word, "верас");
+    EXPECT_EQ(result.variants[0].dictionary_entry.word, "верас");
+    EXPECT_EQ(result.variants[0].dictionary_entry.id, 3);
     EXPECT_FALSE(result.variants[0].exact_match);
     EXPECT_TRUE(result.rhymes.empty());
 }
@@ -112,11 +115,9 @@ TEST(RyfmachService, PrefersOneExactPronunciationOverCorrection) {
 
     ASSERT_EQ(result.status, RhymeResolutionStatus::kResolved);
     ASSERT_TRUE(result.selected_variant.has_value());
-    EXPECT_EQ(result.selected_variant->word, "сена");
+    EXPECT_EQ(result.selected_variant->dictionary_entry.word, "сена");
     EXPECT_TRUE(result.selected_variant->exact_match);
-    EXPECT_EQ(
-        WordIds(result.selected_variant->dictionary_entries),
-        std::vector<int>{19});
+    EXPECT_EQ(result.selected_variant->dictionary_entry.id, 19);
     EXPECT_TRUE(result.variants.empty());
 }
 
@@ -154,11 +155,60 @@ TEST(RyfmachService, FindsRhymesForManualAccentWithoutDictionaryLookup) {
 
     ASSERT_EQ(result.status, RhymeResolutionStatus::kResolved);
     ASSERT_TRUE(result.selected_variant.has_value());
-    EXPECT_EQ(result.selected_variant->word, "ката");
-    EXPECT_EQ(result.selected_variant->accent, 1);
+    EXPECT_EQ(result.selected_variant->dictionary_entry.word, "ката");
+    EXPECT_EQ(result.selected_variant->dictionary_entry.accent, 1);
+    EXPECT_EQ(result.selected_variant->dictionary_entry.id, 0);
     EXPECT_TRUE(result.selected_variant->exact_match);
-    EXPECT_TRUE(result.selected_variant->dictionary_entries.empty());
     EXPECT_FALSE(result.rhymes.empty());
+}
+
+TEST(RyfmachService, ResolvesAnExactDictionarySelectionByIdentity) {
+    const ryfmach::bel::Slounik slounik(SharedSlounikTestDatabasePath());
+    const ryfmach::app::RyfmachService service(slounik);
+
+    const auto result = service.FindRhymes(
+        "ласка", 1, 12, ryfmach::bel::RhymeSearchFilters{});
+
+    ASSERT_EQ(result.status, RhymeResolutionStatus::kResolved);
+    ASSERT_TRUE(result.selected_variant.has_value());
+    EXPECT_EQ(result.selected_variant->dictionary_entry.id, 12);
+    EXPECT_EQ(result.selected_variant->dictionary_entry.initial_id, 12);
+    EXPECT_EQ(result.selected_variant->dictionary_entry.part_of_speech_id, 2);
+}
+
+TEST(RyfmachService, PreservesCompoundSurfaceForDictionarySelection) {
+    const ryfmach::bel::Slounik slounik(SharedSlounikTestDatabasePath());
+    const ryfmach::app::RyfmachService service(slounik);
+
+    const auto lookup = service.FindRhymes(
+        "што-дзень", ryfmach::bel::RhymeSearchFilters{});
+    ASSERT_EQ(lookup.status, RhymeResolutionStatus::kResolved);
+    ASSERT_TRUE(lookup.selected_variant.has_value());
+    EXPECT_EQ(lookup.selected_variant->dictionary_entry.id, 4);
+    EXPECT_EQ(lookup.selected_variant->dictionary_entry.word, "што-дзень");
+    EXPECT_EQ(lookup.selected_variant->dictionary_entry.accent, 6);
+
+    const auto selected = service.FindRhymes(
+        "што-дзень", 6, 4, ryfmach::bel::RhymeSearchFilters{});
+    ASSERT_EQ(selected.status, RhymeResolutionStatus::kResolved);
+    ASSERT_TRUE(selected.selected_variant.has_value());
+    EXPECT_EQ(selected.selected_variant->dictionary_entry.id, 4);
+    EXPECT_EQ(selected.selected_variant->dictionary_entry.word, "што-дзень");
+    EXPECT_EQ(selected.selected_variant->dictionary_entry.accent, 6);
+}
+
+TEST(RyfmachService, RejectsMismatchedDictionarySelectionIdentity) {
+    const ryfmach::bel::Slounik slounik(SharedSlounikTestDatabasePath());
+    const ryfmach::app::RyfmachService service(slounik);
+
+    EXPECT_EQ(
+        service.FindRhymes(
+            "ласка", 1, 13, ryfmach::bel::RhymeSearchFilters{}).status,
+        RhymeResolutionStatus::kNotFound);
+    EXPECT_EQ(
+        service.FindRhymes(
+            "ласка", 1, -1, ryfmach::bel::RhymeSearchFilters{}).status,
+        RhymeResolutionStatus::kNotFound);
 }
 
 TEST(RyfmachService, RejectsInvalidInputBeforePhoneticsAndRhymes) {

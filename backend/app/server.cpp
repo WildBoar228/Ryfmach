@@ -74,18 +74,17 @@ json WordRecordToJson(const bel::WordRecord& word) {
     return result;
 }
 
-json PronunciationVariantToJson(const PronunciationVariant& pronunciation) {
-    json dictionary_entries = json::array();
-    for (const auto& entry : pronunciation.dictionary_entries) {
-        dictionary_entries.push_back(WordRecordToJson(entry));
-    }
-
-    return {
-        {"word", pronunciation.word},
-        {"accent", pronunciation.accent},
-        {"exact_match", pronunciation.exact_match},
-        {"dictionary_entries", std::move(dictionary_entries)},
+json RhymeWordVariantToJson(const RhymeWordVariant& variant) {
+    json result = {
+        {"word", variant.dictionary_entry.word},
+        {"accent", variant.dictionary_entry.accent},
+        {"exact_match", variant.exact_match},
+        {"dictionary_entry", WordRecordToJson(variant.dictionary_entry)},
     };
+    if (variant.dictionary_entry.id != 0) {
+        result["dictionary_id"] = variant.dictionary_entry.id;
+    }
+    return result;
 }
 
 json RhymesResultToJson(const RhymesResult& result) {
@@ -95,8 +94,8 @@ json RhymesResultToJson(const RhymesResult& result) {
 
     if (result.status == RhymeResolutionStatus::kNeedsChoice) {
         json variants = json::array();
-        for (const auto& pronunciation : result.variants) {
-            variants.push_back(PronunciationVariantToJson(pronunciation));
+        for (const auto& variant : result.variants) {
+            variants.push_back(RhymeWordVariantToJson(variant));
         }
         return {
             {"status", "needs_choice"},
@@ -112,7 +111,7 @@ json RhymesResultToJson(const RhymesResult& result) {
     return {
         {"status", "resolved"},
         {"selected_variant", result.selected_variant
-            ? PronunciationVariantToJson(*result.selected_variant)
+            ? RhymeWordVariantToJson(*result.selected_variant)
             : json(nullptr)},
         {"rhymes_data", std::move(rhymes)},
     };
@@ -205,7 +204,12 @@ void HandleRhymesRequest(
         }
         ryfmach::bel::RhymeSearchFilters filters = FiltersFromJson(request);
 
-        if (request.contains("accent")) {
+        if (request.contains("dictionary_id")) {
+            const std::size_t accent = request.at("accent").get<std::size_t>();
+            const int dictionary_id = request.at("dictionary_id").get<int>();
+            WriteJson(res, 200, RhymesResultToJson(
+                service.FindRhymes(word, accent, dictionary_id, filters)));
+        } else if (request.contains("accent")) {
             const std::size_t accent = request.at("accent").get<std::size_t>();
             WriteJson(res, 200,
                 RhymesResultToJson(service.FindRhymes(word, accent, filters)));

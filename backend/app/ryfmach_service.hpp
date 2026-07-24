@@ -21,17 +21,15 @@ enum class RhymeResolutionStatus {
     kNotFound,
 };
 
-struct PronunciationVariant {
-    std::string word;
-    std::size_t accent = 0;
+struct RhymeWordVariant {
+    bel::WordRecord dictionary_entry;
     bool exact_match = false;
-    std::vector<bel::WordRecord> dictionary_entries;
 };
 
 struct RhymesResult {
     RhymeResolutionStatus status = RhymeResolutionStatus::kNotFound;
-    std::vector<PronunciationVariant> variants;
-    std::optional<PronunciationVariant> selected_variant;
+    std::vector<RhymeWordVariant> variants;
+    std::optional<RhymeWordVariant> selected_variant;
     std::vector<bel::WordRecord> rhymes;
 };
 
@@ -71,6 +69,11 @@ public:
         std::string_view word,
         std::size_t accent,
         const bel::RhymeSearchFilters&) const;
+    RhymesResult FindRhymes(
+        std::string_view word,
+        std::size_t accent,
+        int dictionary_id,
+        const bel::RhymeSearchFilters&) const;
     PhoneticsResult AnalyzePhonetics(std::string_view word) const;
     PhoneticsResult AnalyzePhonetics(
         std::string_view word,
@@ -84,9 +87,8 @@ public:
         int delta);
 
 private:
-    std::vector<bel::WordRecord> FindRhymesForPronunciation(
-        std::string_view word,
-        std::size_t accent,
+    std::vector<bel::WordRecord> FindRhymesForVariant(
+        const bel::WordRecord& word_variant,
         const bel::RhymeSearchFilters&) const;
     std::optional<PhoneticAnalysis> AnalyzePhoneticsForVariant(
         const bel::WordRecord& word_variant) const;

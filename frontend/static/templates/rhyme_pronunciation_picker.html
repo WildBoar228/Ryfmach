@@ -1,15 +1,35 @@
-    <div id="rhyme-pronunciation-block" class="center-block" aria-live="polite">
-        <fieldset id="rhyme-pronunciation-picker" class="rhyme-pronunciation-picker" hidden>
-            <legend class="info-text">Знойдзена некалькі варыянтаў. Які Вы мелі на ўвазе?</legend>
-            <div id="rhyme-pronunciation-options" class="rhyme-pronunciation-options">
+    <div class="modal fade" tabindex="-1" id="rhyme-pronunciation-modal" aria-labelledby="rhyme-pronunciation-title" aria-describedby="rhyme-pronunciation-instructions">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable rhyme-pronunciation-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title mid-header" id="rhyme-pronunciation-title">Абярыце варыянт слова</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыць"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="info-text rhyme-pronunciation-instructions" id="rhyme-pronunciation-instructions">
+                        Абярыце патрэбны варыянт або пастаўце націск уручную.
+                    </p>
+                    <fieldset id="rhyme-pronunciation-picker" class="rhyme-pronunciation-picker">
+                        <legend class="visually-hidden">Варыянты слова</legend>
+                        <ul id="rhyme-pronunciation-options" class="rhyme-pronunciation-options">
+                        </ul>
+                    </fieldset>
+                </div>
+                <div class="modal-footer rhyme-pronunciation-footer">
+                    <button id="manual-pronunciation-button" type="button" class="modest-button rhyme-word">
+                        Паставіць націск уручную
+                    </button>
+                    <button type="button" class="dull-button rhyme-word" data-bs-dismiss="modal">
+                        Адмена
+                    </button>
+                </div>
             </div>
-            <button id="manual-pronunciation-button" type="button" class="modest-button rhyme-word">
-                Паставіць націск уручную
-            </button>
-        </fieldset>
+        </div>
+    </div>
 
+    <div id="rhyme-pronunciation-block" class="center-block" aria-live="polite">
         <div id="selected-pronunciation-control" class="selected-pronunciation-control" hidden>
-            <span class="info-text">
+            <span class="info-text selected-pronunciation-label">
                 Рыфмы для: <span id="selected-pronunciation-text" class="rhyme-word"></span>
             </span>
             <button id="change-pronunciation-button" type="button" class="modest-button rhyme-word">

@@ -20,6 +20,7 @@ let pronunciationVariants = [];
 let rhymesResponse = null;
 let activeRhymeRequest = null;
 let requestVersion = 0;
+let openManualAccentAfterVariantModal = false;
 
 const searchInputRhyme = document.getElementById("search-input");
 const searchForm = document.getElementById("search-form");
@@ -28,7 +29,7 @@ const searchIcon = document.getElementById("search-icon");
 const searchSpinner = document.getElementById("search-spinner");
 const searchStatusInfo = document.getElementById("search-status-info");
 
-const pronunciationPicker = document.getElementById("rhyme-pronunciation-picker");
+const pronunciationModalElement = document.getElementById("rhyme-pronunciation-modal");
 const pronunciationOptions = document.getElementById("rhyme-pronunciation-options");
 const manualPronunciationButton = document.getElementById("manual-pronunciation-button");
 const selectedPronunciationControl = document.getElementById("selected-pronunciation-control");
@@ -39,6 +40,7 @@ const rhymesBlock = document.getElementById("rhymes-block");
 const rhymesCountText = document.getElementById("rhyme-count-text");
 const rhymesList = document.getElementById("rhymes-list");
 
+const pronunciationModal = new bootstrap.Modal(pronunciationModalElement);
 const manualAccentModal = new bootstrap.Modal(document.getElementById("manual-accent-modal"));
 const letterButtonsBlock = document.getElementById("letter-buttons-block");
 const searchAccentButton = document.getElementById("search-accent-button");
@@ -98,13 +100,24 @@ function bind_events() {
         if (currentWord && editedWord !== currentWord)
             reset_search_state();
     });
-    pronunciationOptions.addEventListener("change", (event) => {
-        const radio = event.target.closest("[data-pronunciation-index]");
-        if (radio)
-            select_variant(Number(radio.dataset.pronunciationIndex));
+    pronunciationOptions.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-pronunciation-index]");
+        if (button)
+            select_variant(Number(button.dataset.pronunciationIndex));
     });
-    manualPronunciationButton.addEventListener(
-        "click", () => open_manual_accent_picker(false));
+    pronunciationModalElement.addEventListener("shown.bs.modal", () => {
+        pronunciationOptions.querySelector("button")?.focus();
+    });
+    pronunciationModalElement.addEventListener("hidden.bs.modal", () => {
+        if (!openManualAccentAfterVariantModal)
+            return;
+        openManualAccentAfterVariantModal = false;
+        open_manual_accent_picker(false);
+    });
+    manualPronunciationButton.addEventListener("click", () => {
+        openManualAccentAfterVariantModal = true;
+        pronunciationModal.hide();
+    });
     changePronunciationButton.addEventListener("click", change_pronunciation);
     searchAccentButton.addEventListener("click", post_rhymes_with_manual_accent);
     saveFiltersButton.addEventListener("click", update_filters);
@@ -145,24 +158,15 @@ function word_with_accent(word, accent, accentClass = "accent-vowel") {
 function pronunciation_accessible_label(pronunciation) {
     const stressedLetter = pronunciation.word[pronunciation.accent] ?? "";
     let label = `${pronunciation.word}, націск на літару «${stressedLetter}»`;
+    const entry = pronunciation.dictionary_entry;
+    if (entry && !entry.is_initial && entry.initial_word) {
+        label += `, пачатковая форма ${entry.initial_word}`;
+    }
+    if (entry?.part_of_speech)
+        label += `, ${entry.part_of_speech}`;
     if (!pronunciation.exact_match)
         label += ", магчымае выпраўленне напісання";
     return label;
-}
-
-
-function pronunciation_details(pronunciation) {
-    const details = new Set();
-    for (const entry of pronunciation.dictionary_entries ?? []) {
-        const parts = [];
-        if (entry.initial_word && entry.initial_word !== pronunciation.word)
-            parts.push(`пачатковая форма: ${entry.initial_word}`);
-        if (entry.part_of_speech)
-            parts.push(entry.part_of_speech);
-        if (parts.length > 0)
-            details.add(parts.join(", "));
-    }
-    return Array.from(details).join("; ");
 }
 
 
@@ -174,13 +178,24 @@ function normalize_pronunciation(pronunciation) {
     if (!Number.isInteger(accent) || accent < 0 || accent >= pronunciation.word.length)
         return null;
 
+    const dictionaryId = pronunciation.dictionary_id === undefined
+        ? null
+        : Number(pronunciation.dictionary_id);
+    if (dictionaryId !== null &&
+        (!Number.isInteger(dictionaryId) || dictionaryId <= 0)) {
+        return null;
+    }
+
     return {
+        dictionary_id: dictionaryId,
         word: pronunciation.word,
         accent: accent,
         exact_match: pronunciation.exact_match === true,
-        dictionary_entries: Array.isArray(pronunciation.dictionary_entries)
-            ? pronunciation.dictionary_entries
-            : [],
+        dictionary_entry:
+            pronunciation.dictionary_entry &&
+            typeof pronunciation.dictionary_entry === "object"
+                ? pronunciation.dictionary_entry
+                : null,
     };
 }
 
@@ -387,7 +402,8 @@ function reset_search_state() {
     selectedPronunciation = null;
     pronunciationVariants = [];
     rhymesResponse = null;
-    pronunciationPicker.hidden = true;
+    openManualAccentAfterVariantModal = false;
+    pronunciationModal.hide();
     selectedPronunciationControl.hidden = true;
     pronunciationOptions.replaceChildren();
     hide_rhyme_results();
@@ -396,13 +412,15 @@ function reset_search_state() {
 }
 
 
-function request_payload(word, accent = null) {
+function request_payload(word, accent = null, dictionaryId = null) {
     const payload = {
         word: word,
         ...read_filters(),
     };
     if (accent !== null)
         payload.accent = accent;
+    if (dictionaryId !== null)
+        payload.dictionary_id = dictionaryId;
     return payload;
 }
 
@@ -427,7 +445,7 @@ function start_new_search() {
 
 function request_rhyme_resolution() {
     set_search_state(RhymeSearchState.lookingUp);
-    pronunciationPicker.hidden = true;
+    pronunciationModal.hide();
     selectedPronunciationControl.hidden = true;
     hide_rhyme_results();
     render_status("");
@@ -442,7 +460,7 @@ function request_rhyme_resolution() {
 
 function response_error() {
     set_search_state(RhymeSearchState.error);
-    pronunciationPicker.hidden = true;
+    pronunciationModal.hide();
     selectedPronunciationControl.hidden = true;
     hide_rhyme_results();
     render_status("Сервер вярнуў некарэктны вынік пошуку.", "danger");
@@ -486,7 +504,7 @@ function process_resolution_response(data) {
 function render_variant_picker(variants) {
     const normalizedVariants = variants
         .map(normalize_pronunciation)
-        .filter((variant) => variant !== null);
+        .filter((variant) => variant !== null && variant.dictionary_id !== null);
     if (normalizedVariants.length === 0) {
         response_error();
         return;
@@ -498,62 +516,74 @@ function render_variant_picker(variants) {
     set_search_state(RhymeSearchState.needsChoice);
     hide_rhyme_results();
     selectedPronunciationControl.hidden = true;
+    render_pronunciation_options();
+    pronunciationModal.show();
+    render_status("");
+}
+
+
+function render_pronunciation_options() {
     pronunciationOptions.replaceChildren();
 
-    normalizedVariants.forEach((pronunciation, index) => {
-        const option = document.createElement("div");
-        option.className = "form-check rhyme-pronunciation-option";
+    pronunciationVariants.forEach((pronunciation, index) => {
+        const option = document.createElement("li");
+        option.className = "rhyme-pronunciation-option";
 
-        const radio = document.createElement("input");
-        radio.className = "form-check-input yellow-checkbox";
-        radio.type = "radio";
-        radio.name = "rhyme-pronunciation";
-        radio.id = `rhyme-pronunciation-${index}`;
-        radio.dataset.pronunciationIndex = String(index);
-        radio.setAttribute("aria-label", pronunciation_accessible_label(pronunciation));
+        const button = document.createElement("button");
+        button.className = "rhyme-pronunciation-option-button";
+        button.type = "button";
+        button.dataset.pronunciationIndex = String(index);
+        button.setAttribute(
+            "aria-label", pronunciation_accessible_label(pronunciation));
 
-        const label = document.createElement("label");
-        label.className = "form-check-label small-info-text";
-        label.htmlFor = radio.id;
+        const bullet = document.createElement("span");
+        bullet.className = "rhyme-pronunciation-bullet";
+        bullet.setAttribute("aria-hidden", "true");
+        bullet.textContent = "•";
+
+        const text = document.createElement("span");
+        text.className = "rhyme-pronunciation-option-text";
 
         const word = document.createElement("span");
-        word.className = "rhyme-word";
         word.innerHTML = word_with_accent(pronunciation.word, pronunciation.accent);
-        label.appendChild(word);
+        text.appendChild(word);
+
+        const entry = pronunciation.dictionary_entry;
+        if (entry && !entry.is_initial && entry.initial_word) {
+            text.appendChild(document.createTextNode(" ← "));
+            const initialWord = document.createElement("span");
+            initialWord.innerHTML = word_with_accent(
+                entry.initial_word, Number(entry.initial_accent));
+            text.appendChild(initialWord);
+        }
+        if (entry?.part_of_speech) {
+            text.appendChild(document.createTextNode(
+                ` (${entry.part_of_speech})`));
+        }
 
         if (!pronunciation.exact_match) {
             const correction = document.createElement("span");
-            correction.className = "small-info-text";
-            correction.textContent = " — магчымае выпраўленне напісання";
-            label.appendChild(correction);
+            correction.className = "rhyme-pronunciation-correction";
+            correction.textContent = "Магчымае выпраўленне напісання";
+            text.appendChild(correction);
         }
 
-        const details = pronunciation_details(pronunciation);
-        if (details) {
-            const metadata = document.createElement("span");
-            metadata.className = "small-info-text";
-            metadata.textContent = ` — ${details}`;
-            label.appendChild(metadata);
-        }
-
-        option.appendChild(radio);
-        option.appendChild(label);
+        button.appendChild(bullet);
+        button.appendChild(text);
+        option.appendChild(button);
         pronunciationOptions.appendChild(option);
     });
-
-    pronunciationPicker.hidden = false;
-    pronunciationPicker.querySelector("input")?.focus();
-    render_status("");
 }
 
 
 function select_variant(index) {
     const pronunciation = pronunciationVariants[index];
-    if (!pronunciation || searchState !== RhymeSearchState.needsChoice)
+    if (!pronunciation)
         return;
 
+    openManualAccentAfterVariantModal = false;
     selectedPronunciation = pronunciation;
-    pronunciationPicker.hidden = true;
+    pronunciationModal.hide();
     render_selected_pronunciation();
     request_selected_rhymes();
 }
@@ -567,6 +597,18 @@ function render_selected_pronunciation() {
 
     selectedPronunciationText.innerHTML = word_with_accent(
         selectedPronunciation.word, selectedPronunciation.accent);
+    const entry = selectedPronunciation.dictionary_entry;
+    if (entry && !entry.is_initial && entry.initial_word) {
+        selectedPronunciationText.appendChild(document.createTextNode(" ← "));
+        const initialWord = document.createElement("span");
+        initialWord.innerHTML = word_with_accent(
+            entry.initial_word, Number(entry.initial_accent));
+        selectedPronunciationText.appendChild(initialWord);
+    }
+    if (entry?.part_of_speech) {
+        selectedPronunciationText.appendChild(document.createTextNode(
+            ` (${entry.part_of_speech})`));
+    }
     if (!selectedPronunciation.exact_match) {
         const correction = document.createElement("span");
         correction.className = "small-info-text";
@@ -584,13 +626,16 @@ function request_selected_rhymes(errorMessage = "Не атрымалася зн�
         return;
 
     set_search_state(RhymeSearchState.loadingRhymes);
-    pronunciationPicker.hidden = true;
+    pronunciationModal.hide();
     hide_rhyme_results();
     render_selected_pronunciation();
     render_status("");
 
     send_rhyme_request(
-        request_payload(selectedPronunciation.word, selectedPronunciation.accent),
+        request_payload(
+            selectedPronunciation.word,
+            selectedPronunciation.accent,
+            selectedPronunciation.dictionary_id),
         (data) => process_resolved_response(data, selectedPronunciation),
         errorMessage
     );
@@ -612,11 +657,17 @@ function process_resolved_response(data, preferredPronunciation = null) {
     if (
         preferredPronunciation &&
         preferredPronunciation.word === responsePronunciation.word &&
-        preferredPronunciation.accent === responsePronunciation.accent
+        preferredPronunciation.accent === responsePronunciation.accent &&
+        preferredPronunciation.dictionary_id === responsePronunciation.dictionary_id
     ) {
         selectedPronunciation = preferredPronunciation;
     } else {
         selectedPronunciation = responsePronunciation;
+    }
+
+    if (pronunciationVariants.length === 0 &&
+        selectedPronunciation.dictionary_id !== null) {
+        pronunciationVariants = [selectedPronunciation];
     }
 
     rhymesResponse = {
@@ -630,7 +681,7 @@ function process_resolved_response(data, preferredPronunciation = null) {
 
 
 function render_rhymes(rhymes) {
-    pronunciationPicker.hidden = true;
+    pronunciationModal.hide();
     rhymesList.replaceChildren();
     rhymesBlock.classList.remove("is-hidden");
     rhymesCountText.textContent = `Рыфмы: ${rhymes.length}`;
@@ -725,10 +776,11 @@ function post_rhymes_with_manual_accent() {
 
     manualAccentModal.hide();
     selectedPronunciation = {
+        dictionary_id: null,
         word: currentWord,
         accent: accentIndex,
         exact_match: true,
-        dictionary_entries: [],
+        dictionary_entry: null,
     };
     render_selected_pronunciation();
     request_selected_rhymes();
@@ -739,16 +791,10 @@ function change_pronunciation() {
     if (!currentWord)
         return;
 
-    cancel_active_rhyme_request();
-    selectedPronunciation = null;
-    rhymesResponse = null;
-    selectedPronunciationControl.hidden = true;
-    hide_rhyme_results();
-
     if (pronunciationVariants.length > 0) {
-        render_variant_picker(pronunciationVariants);
+        render_pronunciation_options();
+        pronunciationModal.show();
     } else {
-        set_search_state(RhymeSearchState.needsChoice);
         open_manual_accent_picker(false);
     }
 }
