@@ -15,14 +15,24 @@
 
 namespace ryfmach::app {
 
-struct RhymeGroup {
-    bel::WordRecord word_variant;
-    std::vector<bel::WordRecord> rhymes;
+enum class RhymeResolutionStatus {
+    kResolved,
+    kNeedsChoice,
+    kNotFound,
+};
+
+struct PronunciationVariant {
+    std::string word;
+    std::size_t accent = 0;
+    bool exact_match = false;
+    std::vector<bel::WordRecord> dictionary_entries;
 };
 
 struct RhymesResult {
-    bool word_found = false;
-    std::vector<RhymeGroup> rhymes_list;
+    RhymeResolutionStatus status = RhymeResolutionStatus::kNotFound;
+    std::vector<PronunciationVariant> variants;
+    std::optional<PronunciationVariant> selected_variant;
+    std::vector<bel::WordRecord> rhymes;
 };
 
 struct LetterSoundMap {
@@ -74,8 +84,9 @@ public:
         int delta);
 
 private:
-    RhymeGroup FindRhymesForVariant(
-        const bel::WordRecord& word_variant,
+    std::vector<bel::WordRecord> FindRhymesForPronunciation(
+        std::string_view word,
+        std::size_t accent,
         const bel::RhymeSearchFilters&) const;
     std::optional<PhoneticAnalysis> AnalyzePhoneticsForVariant(
         const bel::WordRecord& word_variant) const;

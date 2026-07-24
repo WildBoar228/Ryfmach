@@ -42,6 +42,7 @@
         </div>
     </div>
 
+    {% if show_word_variants_dropdown | default(true) %}
     <div id="word-variants-block" class="center-block hidden-visibility">
         <div class="dropdown">
             <button class="dropdown-light rhyme-word" type="button" id="dropdown-choose-word" data-bs-toggle="dropdown" aria-expanded="false">
@@ -55,5 +56,6 @@
             <p id="search-status-text" class="search-status-text">Нічога няма</p>
         </div>
     </div>
+    {% endif %}
 
     <div id="error-msg"></div>
