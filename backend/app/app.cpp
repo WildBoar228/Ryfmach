@@ -3,6 +3,7 @@
 #include "server.hpp"
 
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -33,6 +34,14 @@ int GetPort() {
 } // namespace
 
 int main() {
+    try {
+        (void)ryfmach::bel::DefaultSoundCompatibilityTable();
+    } catch (const std::exception& exception) {
+        std::cerr << "failed to load sound compatibility data: "
+                  << exception.what() << "\n";
+        return 1;
+    }
+
     ryfmach::bel::Slounik slounik;
     ryfmach::app::RyfmachService service(
         slounik, std::make_unique<ryfmach::bel::RhymeLikes>());

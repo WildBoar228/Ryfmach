@@ -4,15 +4,19 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
 
 
-def get_required_path(variable_name: str) -> Path:
+def get_required_value(variable_name: str) -> str:
     value = os.getenv(variable_name)
     if not value:
         raise RuntimeError(f"{variable_name} is not set")
-    return Path(value).expanduser()
+    return value
+
+
+def get_required_path(variable_name: str) -> Path:
+    return Path(get_required_value(variable_name)).expanduser()
 
 
 def get_app_port() -> int:
@@ -32,4 +36,5 @@ def get_app_port() -> int:
 
 RHYME_LIKES_DB_PATH = get_required_path("RHYME_LIKES_DB_PATH")
 SLOUNIK_DB_PATH = get_required_path("SLOUNIK_DB_PATH")
+FLASK_SECRET_KEY = get_required_value("FLASK_SECRET_KEY")
 RYFMACH_JINJA_PORT = get_app_port()

@@ -7,12 +7,12 @@ import logging
 import os
 import time
 
-from config import RYFMACH_JINJA_PORT
+from config import FLASK_SECRET_KEY, RYFMACH_JINJA_PORT
 
 app = Flask(__name__,
             static_folder="../frontend/static",
             template_folder='../frontend/static/templates')
-app.config['SECRET_KEY'] = 'garikgoyda_secret_key'
+app.config['SECRET_KEY'] = FLASK_SECRET_KEY
 
 app_file_handler = RotatingFileHandler(
     "logs/app.log",

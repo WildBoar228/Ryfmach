@@ -55,9 +55,9 @@ private:
 std::optional<SoundCompatibilityTable> LoadSoundCompatibilityTable(
     const std::filesystem::path& path);
 
-const SoundCompatibilityTable& DefaultSoundCompatibilityTable() noexcept;
+const SoundCompatibilityTable& DefaultSoundCompatibilityTable();
 
-double SoundReplaceCost(Sound left, Sound right) noexcept;
+double SoundReplaceCost(Sound left, Sound right);
 
 double SoundReplaceCost(
     Sound left,
@@ -66,7 +66,7 @@ double SoundReplaceCost(
 
 double SoundReplaceCost(
     std::optional<Sound> left,
-    std::optional<Sound> right) noexcept;
+    std::optional<Sound> right);
 
 double SoundReplaceCost(
     std::optional<Sound> left,

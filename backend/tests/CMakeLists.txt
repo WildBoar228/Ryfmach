@@ -35,4 +35,9 @@ target_link_options(ryfmach_tests PRIVATE "-fsanitize=address,leak,undefined")
 target_include_directories(ryfmach_tests PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
 include(GoogleTest)
-gtest_discover_tests(ryfmach_tests)
+gtest_discover_tests(
+    ryfmach_tests
+    PROPERTIES
+    ENVIRONMENT
+    "RYFMACH_SOUND_COMPATIBILITY_PATH=${PROJECT_SOURCE_DIR}/lib/bel_lang_engine/data/sound_compatibility.tsv"
+)

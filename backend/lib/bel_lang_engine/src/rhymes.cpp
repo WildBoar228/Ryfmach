@@ -5,10 +5,12 @@
 #include "utils/hash.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <fstream>
 #include <ranges>
 #include <span>
 #include <sstream>
+#include <stdexcept>
 #include <vector>
 
 namespace ryfmach::bel {
@@ -21,6 +23,8 @@ constexpr std::size_t kPhonemeCount =
 constexpr std::size_t kStressedVowelCount = 6;
 
 constexpr std::size_t kTranscriptionBufSize = 20;
+constexpr char kSoundCompatibilityPathVariable[] =
+    "RYFMACH_SOUND_COMPATIBILITY_PATH";
 
 // Keys: empty, base phonemes in Phoneme enum order, then stressed vowels.
 static_assert(
@@ -318,15 +322,21 @@ std::optional<SoundCompatibilityTable> LoadSoundCompatibilityTable(
     return table;
 }
 
-const SoundCompatibilityTable& DefaultSoundCompatibilityTable() noexcept {
+const SoundCompatibilityTable& DefaultSoundCompatibilityTable() {
     static const SoundCompatibilityTable table = [] {
-#ifdef RYFMACH_SOUND_COMPATIBILITY_PATH
-        if (const auto loaded =
-                LoadSoundCompatibilityTable(RYFMACH_SOUND_COMPATIBILITY_PATH)) {
-            return *loaded;
+        const char* path = std::getenv(kSoundCompatibilityPathVariable);
+        if (path == nullptr || std::string_view(path).empty()) {
+            throw std::runtime_error(
+                "RYFMACH_SOUND_COMPATIBILITY_PATH is not set");
         }
-#endif
-        return SoundCompatibilityTable();
+
+        const auto loaded = LoadSoundCompatibilityTable(path);
+        if (!loaded) {
+            throw std::runtime_error(
+                "failed to load sound compatibility table from " +
+                std::string(path));
+        }
+        return *loaded;
     }();
 
     return table;
@@ -371,7 +381,7 @@ std::optional<std::uint64_t> SoundHash(
     return utils::DigestModulo(utils::Sha1(*working_part), kSoundHashMod);
 }
 
-double SoundReplaceCost(Sound left, Sound right) noexcept {
+double SoundReplaceCost(Sound left, Sound right) {
     return SoundReplaceCost(left, right, DefaultSoundCompatibilityTable());
 }
 
@@ -384,7 +394,7 @@ double SoundReplaceCost(
 
 double SoundReplaceCost(
     std::optional<Sound> left,
-    std::optional<Sound> right) noexcept {
+    std::optional<Sound> right) {
     return SoundReplaceCost(left, right, DefaultSoundCompatibilityTable());
 }
 
