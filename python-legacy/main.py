@@ -1,4 +1,8 @@
-from flask import Flask, render_template, redirect, request, make_response, session, jsonify, send_from_directory
+from flask import (
+    Flask, Response,
+    session, request,
+    render_template, send_from_directory, jsonify
+)
 import json
 from pprint import pprint
 
@@ -6,8 +10,17 @@ from logging.handlers import RotatingFileHandler
 import logging
 import os
 import time
+from http.client import HTTPConnection
 
 from config import FLASK_SECRET_KEY, RYFMACH_JINJA_PORT
+
+API_PATHS = {
+    "rhymes",
+    "phonetics",
+    "morphemics",
+    "rhyme/like",
+    "rhyme/dislike",
+}
 
 app = Flask(__name__,
             static_folder="../frontend/static",
@@ -73,6 +86,35 @@ def morphemics_page():
         add_search_filter_button=False,
         canonical_url="https://ryfmach.online/morphemics"
     )
+
+
+@app.post("/api/<path:api_path>")
+def proxy_api(api_path):
+    if api_path not in API_PATHS:
+        return jsonify({"error": "Not found"}), 404
+
+    connection = HTTPConnection("127.0.0.1", 8081, timeout=30)
+
+    try:
+        connection.request(
+            method="POST",
+            url=f"/api/{api_path}",
+            body=request.get_data(cache=False),
+            headers={"Content-Type": request.content_type or "application/json"},
+        )
+        upstream = connection.getresponse()
+        body = upstream.read()
+
+        response = Response(body, status=upstream.status)
+        content_type = upstream.getheader("Content-Type")
+        if content_type:
+            response.headers["Content-Type"] = content_type
+        return response
+    except OSError:
+        app.logger.exception("C++ API is unavailable")
+        return jsonify({"error": "API is unavailable"}), 502
+    finally:
+        connection.close()
 
 
 @app.route('/favicon.ico')
