@@ -33,7 +33,6 @@ jobs:
             git \
             gzip \
             make \
-            ninja-build \
             python3 \
             python3-pip \
             tar
@@ -49,7 +48,6 @@ jobs:
           cmake \
             -S backend \
             -B build \
-            -G Ninja \
             -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
