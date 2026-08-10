@@ -48,7 +48,7 @@ jobs:
           cmake \
             -S backend \
             -B build \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
             --target ryfmach
 
       - name: Build
