@@ -49,6 +49,7 @@ jobs:
             -S backend \
             -B build \
             -DCMAKE_BUILD_TYPE=Release
+            --target ryfmach
 
       - name: Build
         run: cmake --build build --parallel 2
