@@ -425,29 +425,29 @@ void CalcRhymeCostDp(
     const int M = static_cast<int>(t2.size());
     for (int i = 0; i <= N; ++i) {
         for (int j = 0; j <= M; ++j) {
-            dp[i, j] = kDefaultUnknownReplaceCost;
-            anc[i, j] = 0;
+            dp.Get(i, j) = kDefaultUnknownReplaceCost;
+            anc.Get(i, j) = 0;
         }
     }
-    dp[0, 0] = 0;
+    dp.Get(0, 0) = 0;
 
     for (int i = 1; i <= N; ++i) {
         const int lower = std::max(1, i - max_shift);
         const int upper = std::min(M, i + max_shift);
         for (int j = lower; j <= upper; ++j) {
-            if (i >= j - max_shift && dp[i - 1, j] < dp[i, j]) {
-                dp[i, j] = dp[i - 1, j];
-                anc[i, j] = 1;
+            if (i >= j - max_shift && dp.Get(i - 1, j) < dp.Get(i, j)) {
+                dp.Get(i, j) = dp.Get(i - 1, j);
+                anc.Get(i, j) = 1;
             }
-            if (j >= i - max_shift && dp[i, j - 1] < dp[i, j]) {
-                dp[i, j] = dp[i, j - 1];
-                anc[i, j] = 2;
+            if (j >= i - max_shift && dp.Get(i, j - 1) < dp.Get(i, j)) {
+                dp.Get(i, j) = dp.Get(i, j - 1);
+                anc.Get(i, j) = 2;
             }
-            if (dp[i - 1, j - 1] < dp[i, j]) {
-                dp[i, j] = dp[i - 1, j - 1];
-                anc[i, j] = 3;
+            if (dp.Get(i - 1, j - 1) < dp.Get(i, j)) {
+                dp.Get(i, j) = dp.Get(i - 1, j - 1);
+                anc.Get(i, j) = 3;
             }
-            dp[i, j] += SoundReplaceCost(t1[i - 1], t2[j - 1]);
+            dp.Get(i, j) += SoundReplaceCost(t1[i - 1], t2[j - 1]);
         }
     }
 }
@@ -459,12 +459,12 @@ double CalcPrefixCost(
 ) {
     double prefix_cost = 0;
     for (int i = 1; i <= std::min(N, M); ++i) {
-        double minim = dp_span[i, i];
+        double minim = dp_span.Get(i, i);
         const int lower = std::max(1, i - max_shift);
         const int upper = std::min(M, i + max_shift);
         for (int j = lower; j <= upper; ++j) {
-            if (dp_span[i, j] < minim) {
-                minim = dp_span[i, j];
+            if (dp_span.Get(i, j) < minim) {
+                minim = dp_span.Get(i, j);
             }
         }
         prefix_cost += minim - i;
@@ -519,7 +519,7 @@ RhymeCostType CalcRhymeCost(
     auto suffix1 = t1.subspan(cut_index1);
     auto suffix2 = t2.subspan(cut_index2);
     CalcRhymeCostDp(suffix1, suffix2, dp_span, anc_span, max_shift);
-    double suffix_cost = dp_span[suffix1.size(), suffix2.size()];
+    double suffix_cost = dp_span.Get(suffix1.size(), suffix2.size());
 
     auto prefix1 = t1.subspan(0, cut_index1) | std::views::reverse;
     auto prefix2 = t2.subspan(0, cut_index2) | std::views::reverse;

@@ -35,7 +35,7 @@ public:
     MatrixSpan2d& operator=(const MatrixSpan2d& other) = default;
     MatrixSpan2d& operator=(MatrixSpan2d&& other) = default;
 
-    T& operator[](std::size_t r, std::size_t c) {
+    T& Get(std::size_t r, std::size_t c) {
         return content_[r * stride_ + c];
     }
 };
