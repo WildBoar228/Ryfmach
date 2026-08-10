@@ -48,11 +48,10 @@ jobs:
           cmake \
             -S backend \
             -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            --target ryfmach
+            -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --parallel 2
+        run: cmake --build build --target ryfmach --parallel 2
 
       - name: Run tests
         env:
