@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="be">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Рыфмач часова недаступны праз тэхнічныя працы.">
+    <link rel="stylesheet" href="{{url_for('static', filename='css/style.css') + '?ver=1.5.4'}}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <title>Тэхнічныя працы — Рыфмач</title>
+</head>
+<body class="maintenance-page">
+    <main class="maintenance-main">
+        <img src="{{ url_for('static', filename='img/logo.png') }}" class="main-logo maintenance-logo" alt="Рыфмач">
+
+        <section class="maintenance-card" aria-labelledby="maintenance-title">
+            <div class="maintenance-mark" aria-hidden="true">
+                <span></span>
+            </div>
+            <p class="maintenance-kicker">Рыфмач абнаўляецца</p>
+            <h1 class="maintenance-title" id="maintenance-title">Тэхнічныя працы</h1>
+            <p class="description maintenance-description">
+                Мы ўжо працуем над сайтам. Калі ласка, завітайце крыху пазней.
+            </p>
+        </section>
+    </main>
+</body>
+</html>

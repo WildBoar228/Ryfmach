@@ -466,8 +466,92 @@
 }
 
 .maintenance-title{
+    margin: 8px 0 14px;
     text-align: center;
-    width: 100%;
+    font: bold clamp(2rem, 5vw, 3rem) Arial, sans-serif;
+    line-height: 1.1;
+    color: black;
+}
+
+.maintenance-page{
+    min-height: 100vh;
+    margin: 0;
+    background-color: rgb(255, 254, 247);
+    background-image: radial-gradient(circle at top, var(--light-primary-color) 0, rgba(255, 240, 154, 0) min(55vw, 520px));
+}
+
+.maintenance-main{
+    min-height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: clamp(32px, 7vh, 64px);
+    padding: 40px 16px;
+}
+
+.maintenance-logo{
+    margin: 0;
+    width: min(58vw, 320px);
+    border-radius: 16px;
+}
+
+.maintenance-card{
+    width: min(100%, 680px);
+    box-sizing: border-box;
+    padding: clamp(32px, 6vw, 56px);
+    border: 1px solid rgb(235, 229, 198);
+    border-radius: 24px;
+    background-color: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 16px 45px rgba(98, 81, 0, 0.12);
+    text-align: center;
+}
+
+.maintenance-mark{
+    width: 52px;
+    height: 52px;
+    margin: 0 auto 24px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.maintenance-mark span{
+    width: 14px;
+    height: 14px;
+    border: 4px solid black;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: maintenance-spin 1.1s linear infinite;
+}
+
+.maintenance-kicker{
+    margin: 0;
+    font: bold 0.9rem Arial, sans-serif;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(110, 94, 0);
+}
+
+.maintenance-description{
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.5;
+}
+
+@keyframes maintenance-spin{
+    to{
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce){
+    .maintenance-mark span{
+        animation: none;
+    }
 }
 
 .one-line-input{
@@ -642,6 +726,25 @@
 
     .rhymes-block{
         width: calc(100% - 24px);
+    }
+
+    .maintenance-page{
+        padding-bottom: 0;
+    }
+
+    .maintenance-main{
+        justify-content: flex-start;
+        gap: 36px;
+        padding: max(48px, env(safe-area-inset-top)) 16px 32px;
+    }
+
+    .maintenance-logo{
+        width: min(70vw, 280px);
+    }
+
+    .maintenance-card{
+        padding: 32px 22px;
+        border-radius: 20px;
     }
 
     .rhyme-count-row{

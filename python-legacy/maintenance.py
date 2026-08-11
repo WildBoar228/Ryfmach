@@ -1,0 +1,20 @@
+from flask import Flask, render_template
+
+from config import RYFMACH_JINJA_PORT
+
+
+app = Flask(
+    __name__,
+    static_folder="../frontend/static",
+    template_folder="../frontend/static/templates",
+)
+
+
+@app.get("/")
+@app.get("/<path:path>")
+def reconstruct_page(path: str = ""):
+    return render_template("maintenance.html")
+
+
+if __name__ == "__main__":
+    app.run(port=RYFMACH_JINJA_PORT, host="127.0.0.1")
