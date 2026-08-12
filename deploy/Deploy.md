@@ -20,9 +20,9 @@ All paths below are inside the hosting account's home directory.
 ├── db/
 │   ├── shared/
 │   │   └── Slounik5.db
-│   ├── production/
+│   ├── ryfmach.by/
 │   │   └── RhymeLikes.db
-│   └── test/
+│   └── ryfmach.xyz/
 │       └── RhymeLikes.db
 ├── logs/
 │   ├── ryfmach.by/
@@ -58,7 +58,7 @@ Recommended permissions:
 ```bash
 chmod 700 ~/config ~/db ~/logs
 chmod 600 ~/config/ryfmach.by.env ~/config/ryfmach.xyz.env
-chmod 600 ~/db/production/RhymeLikes.db ~/db/test/RhymeLikes.db
+chmod 600 ~/db/ryfmach.by/RhymeLikes.db ~/db/ryfmach.xyz/RhymeLikes.db
 ```
 
 ## Release format
@@ -126,7 +126,7 @@ RYFMACH_JINJA_PORT=8082
 
 RYFMACH_SOUND_COMPATIBILITY_PATH=/home/USERNAME/www/ryfmach.by/Ryfmach/data/sound_compatibility.tsv
 SLOUNIK_DB_PATH=/home/USERNAME/db/shared/Slounik5.db
-RHYME_LIKES_DB_PATH=/home/USERNAME/db/production/RhymeLikes.db
+RHYME_LIKES_DB_PATH=/home/USERNAME/db/ryfmach.by/RhymeLikes.db
 
 FLASK_SECRET_KEY=replace-with-a-persistent-random-production-secret
 PUBLIC_BASE_URL=https://ryfmach.by
@@ -150,7 +150,7 @@ RYFMACH_JINJA_PORT=8182
 
 RYFMACH_SOUND_COMPATIBILITY_PATH=/home/USERNAME/www/ryfmach.xyz/Ryfmach/data/sound_compatibility.tsv
 SLOUNIK_DB_PATH=/home/USERNAME/db/shared/Slounik5.db
-RHYME_LIKES_DB_PATH=/home/USERNAME/db/test/RhymeLikes.db
+RHYME_LIKES_DB_PATH=/home/USERNAME/db/ryfmach.xyz/RhymeLikes.db
 
 FLASK_SECRET_KEY=replace-with-a-persistent-random-test-secret
 PUBLIC_BASE_URL=https://ryfmach.xyz
