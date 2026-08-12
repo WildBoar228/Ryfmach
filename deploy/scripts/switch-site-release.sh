@@ -28,23 +28,6 @@ exec 8>"$STATE_DIR/deploy.lock"
 flock -n 8 || die "another release switch is active for $SITE_DIR"
 
 switch_link="$RELEASE_LINK"
-site_link_target=""
-if [[ -L "$RELEASE_LINK" ]]; then
-    site_link_target="$(readlink -- "$RELEASE_LINK")"
-    if [[ "$site_link_target" = /* ]]; then
-        site_link_path="$site_link_target"
-    else
-        site_link_path="$(readlink -m -- "$SITE_DIR/$site_link_target")"
-    fi
-
-    # Production normally has Ryfmach -> ~/releases/current. Preserve that
-    # stable site link and atomically update the current link instead.
-    if [[ "$(basename -- "$site_link_path")" == "current" &&
-          -L "$site_link_path" ]]; then
-        switch_link="$site_link_path"
-    fi
-fi
-
 previous_target=""
 if [[ -L "$switch_link" ]]; then
     previous_target="$(readlink -- "$switch_link")"

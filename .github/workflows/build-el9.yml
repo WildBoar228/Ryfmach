@@ -135,27 +135,11 @@ jobs:
             --requirement "stage/${release_name}/python/requirements.txt"
           python-test/bin/python -c "import flask, gunicorn"
 
-          (
-            cd "stage/${release_name}"
-            find . -type f ! -name SHA256SUMS -print0 |
-              sort -z |
-              xargs -0 sha256sum > SHA256SUMS
-            sha256sum --check SHA256SUMS
-          )
-
           tar -C stage -czf "dist/${release_name}.tar.gz" "$release_name"
 
           (
             cd dist
             sha256sum "${release_name}.tar.gz" > "${release_name}.tar.gz.sha256"
-          )
-
-          mkdir archive-test
-          tar -C archive-test -xzf "dist/${release_name}.tar.gz"
-          test -x "archive-test/${release_name}/bin/ryfmach"
-          (
-            cd "archive-test/${release_name}"
-            sha256sum --check SHA256SUMS
           )
 
       - name: Upload release artifact

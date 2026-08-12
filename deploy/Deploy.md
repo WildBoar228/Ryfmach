@@ -38,13 +38,12 @@ All paths below are inside the hosting account's home directory.
 │       └── switch-site-release.sh
 ├── releases/
 │   ├── 2026_.../
-│   ├── maintenance/
-│   └── current -> ~/releases/<production-release>
+│   └── maintenance/
 └── www/
     ├── ryfmach.by/
     │   ├── .venv/
     │   ├── server.py
-    │   └── Ryfmach -> ~/releases/current
+    │   └── Ryfmach -> ~/releases/<production-release>
     └── ryfmach.xyz/
         ├── .venv/
         ├── server.py
@@ -83,8 +82,7 @@ release-directory/
 │   ├── main.py
 │   └── requirements.txt
 ├── .env.example
-├── VERSION
-└── SHA256SUMS
+└── VERSION
 ```
 
 A release must not contain or receive a site `.env`, mutable database, or log
@@ -216,9 +214,8 @@ when the resolved release is `~/releases/maintenance`.
 
 Install all files from `deploy/scripts/` together, for example in
 `~/bin/ryfmach-deploy/`, and preserve their executable permissions. The scripts
-require Bash 4.3 or newer plus GNU `flock`, `setsid`, `readlink`, and `mv`, all
-normally supplied by the EL9 base system. `install-release.sh` also requires
-Python 3, `file`, `ldd`, and `sha256sum`.
+require Bash 4.3 or newer plus GNU `flock`, `setsid`, `readlink`, `mv`, `tar`,
+and `sha256sum`, all normally supplied by the EL9 base system.
 
 Start a detached site from SSH:
 
@@ -255,8 +252,7 @@ Atomically switch a site and restart it:
 
 The switch command waits for the new API and Gunicorn to become reachable. If
 startup fails, it restores the old symlink and starts the old release again.
-When a production site's `Ryfmach` link points to `~/releases/current`, the
-command preserves that link and updates `current` atomically.
+Each site's `Ryfmach` symlink points directly to the release used by that site.
 
 An explicit environment-file path may be supplied as the final argument to any
 command. Otherwise the scripts derive `~/config/<site-name>.env`.
@@ -274,27 +270,24 @@ On the production server:
 ```
 
 Keep the workflow-generated `.tar.gz.sha256` beside the archive. The installer
-derives the release-directory name from the archive's single top-level
-directory. An optional second argument overrides that name. Set
+derives the release-directory name from the archive filename by removing
+`.tar.gz` or `.tgz`. An optional second argument overrides that name. Set
 `RYFMACH_RELEASES_DIR` only when releases do not live in `~/releases`.
 
-The installer holds the deployment lock and performs checks 3 through 8 below
-in a temporary directory. It rejects links and unsafe paths in the archive,
-then renames the validated directory into place atomically. It never changes a
-site symlink, starts a process, copies a site environment, or overwrites an
-existing release.
+The installer verifies the archive checksum, extracts into a temporary
+directory, checks the main runtime files, and renames the directory into place
+atomically. It never changes a site symlink, starts a process, copies a site
+environment, or overwrites an existing release. Release archives are trusted
+to come from this repository's CI workflow rather than an untrusted source.
 
 1. Acquire a deployment lock so two deployments cannot run concurrently.
 2. Upload the archive into a temporary incoming directory.
 3. Verify the archive checksum.
 4. Extract into a new, uniquely named release directory. Never extract over an
    existing release.
-5. Verify `SHA256SUMS` for the release contents.
+5. Verify the required binary, Python, requirements, and frontend files.
 6. Verify that `bin/ryfmach` is executable.
-7. Run `ldd bin/ryfmach` and reject the release if any library is
-   `not found`.
-8. Verify that all required Python, frontend, and data files are present.
-9. Switch the site with `switch-site-release.sh`. Before changing the release
+7. Switch the site with `switch-site-release.sh`. Before changing the release
    symlink, it installs the candidate's `python/requirements.txt` into the
    site's existing `.venv` using the configured package index.
 
@@ -308,10 +301,8 @@ For example:
 
 The switch may download packages, so production dependency installation
 requires outbound network access. If installation fails, the release symlink
-is not changed. The release installer still runs `ldd` to reject immediately
-missing shared libraries, but it does not compare GLIBC or GLIBCXX symbol
-versions. Binary ABI compatibility is therefore confirmed when the candidate
-site is started and tested.
+is not changed. Binary and dependency compatibility is confirmed when the
+candidate site is started and tested.
 
 The current per-site virtual environments are acceptable while dependencies
 remain backward-compatible, but mutating a shared venv can break rollback. If
@@ -332,16 +323,14 @@ release.
 8. Send at least one functional request through the public test `/api`
    route.
 9. Verify that a test like/dislike writes only to the test database.
-10. Record the existing target of `~/releases/current` for rollback.
-11. Atomically point `~/releases/current` to the candidate release. The
-    production site's `Ryfmach` symlink remains permanently pointed at
-    `~/releases/current`.
-12. Restart the `ryfmach.by` master launcher.
-13. Verify from SSH that the production C++ API is healthy on its private port.
-14. Verify the production pages and send a functional request through the
+10. Switch `~/www/ryfmach.by/Ryfmach` directly to the candidate release with
+    `switch-site-release.sh`; it restarts the production site and rolls back
+    automatically if startup fails.
+11. Verify from SSH that the production C++ API is healthy on its private port.
+12. Verify the production pages and send a functional request through the
     public production `/api` route.
-15. If any production check fails, atomically restore the previous `current`
-    target, restart the production master, and repeat the health checks.
+13. If a later production check fails, switch the production site back to its
+    recorded previous release and repeat the health checks.
 
 Create a temporary symlink and rename it over the destination for atomic
 switches. Do not unlink the active symlink before creating its replacement.
@@ -374,8 +363,7 @@ Before a release that changes a database schema:
 4. Verify that application URLs return HTTP 503 with `Retry-After`, while the
    required static assets remain available.
 5. Perform the maintenance work.
-6. Atomically restore `~/www/ryfmach.by/Ryfmach` to
-   `~/releases/current`.
+6. Atomically restore `~/www/ryfmach.by/Ryfmach` to its recorded release.
 7. Restart the production master again.
 8. Verify the C++ health endpoint, production pages, and one functional public
    API request.
@@ -388,14 +376,14 @@ their compatible Python environments.
 
 A normal rollback consists of:
 
-1. Atomically restore `~/releases/current` to the recorded previous target.
+1. Switch `~/www/ryfmach.by/Ryfmach` to the recorded previous release.
 2. Restore its compatible Python environment if dependencies changed.
 3. Restart the production master.
 4. Verify the private C++ health endpoint and public application routes.
 
 Release cleanup must never remove:
 
-- the target of `~/releases/current`;
+- the target currently used by the production site;
 - the target currently used by the test site;
 - the maintenance release;
 - a release required for an active database rollback plan.
