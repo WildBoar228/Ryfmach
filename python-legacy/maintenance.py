@@ -1,6 +1,7 @@
-from flask import Flask, make_response, render_template
+from flask import Flask, make_response, render_template, send_from_directory
 
 from config import RYFMACH_IS_TEST_SITE, RYFMACH_JINJA_PORT
+import os
 
 
 app = Flask(
@@ -9,9 +10,10 @@ app = Flask(
     template_folder="../frontend/static/templates",
 )
 
+PUBLIC_DIRECTORY = os.path.join(app.static_folder, "public")
+
 
 @app.get("/")
-@app.get("/<path:path>")
 def reconstruct_page(path: str = ""):
     response = make_response(
         render_template(
@@ -22,6 +24,11 @@ def reconstruct_page(path: str = ""):
     )
     response.headers["Retry-After"] = "300"
     return response
+
+
+@app.get("/<path:filename>")
+def public_file(filename):
+    return send_from_directory(PUBLIC_DIRECTORY, filename)
 
 
 if __name__ == "__main__":
