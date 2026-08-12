@@ -119,6 +119,11 @@ shell-compatible `NAME=value` assignments and must be writable only by the
 hosting account. Do not define hosting-owned variables such as `PORT` in these
 files.
 
+The site runner exports `PORT=$RYFMACH_JINJA_PORT` after loading the selected
+site environment. `server.py` uses `PORT` for Gunicorn's bind address, and the
+runner probes that same port. Production and test must therefore use different
+`RYFMACH_JINJA_PORT` values; neither environment file needs a `PORT` setting.
+
 The release's `python/config.py` consumes the inherited environment. It must
 not search for `.env` relative to the release directory.
 

@@ -11,8 +11,14 @@ load_site_environment
 
 require_variable RYFMACH_API_HOST
 require_variable RYFMACH_API_PORT
+require_variable RYFMACH_JINJA_PORT
 require_variable RYFMACH_API_LOG_PATH
 require_variable RYFMACH_WEB_LOG_PATH
+
+# server.py reads PORT for Gunicorn's bind address. Override any value inherited
+# from the hosting panel with the private port configured for this site.
+PORT="$RYFMACH_JINJA_PORT"
+export PORT
 
 [[ -L "$RELEASE_LINK" ]] || die "release link does not exist: $RELEASE_LINK"
 [[ -x "$PYTHON_BIN" ]] || die "site Python does not exist: $PYTHON_BIN"
@@ -150,7 +156,7 @@ fi
 web_pid=$!
 
 web_host="${INSTANCE_HOST:-${HOST:-127.0.0.1}}"
-web_port="${PORT:-20006}"
+web_port="$PORT"
 web_start_timeout="${RYFMACH_WEB_START_TIMEOUT:-30}"
 if ! wait_for_http "$web_host" "$web_port" "/" "$web_start_timeout"; then
     die "Gunicorn did not become reachable within ${web_start_timeout}s"
