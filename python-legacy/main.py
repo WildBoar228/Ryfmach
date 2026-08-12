@@ -6,13 +6,20 @@ from flask import (
 import json
 from pprint import pprint
 
-from logging.handlers import RotatingFileHandler
+from logging.handlers import WatchedFileHandler
 import logging
 import os
 import time
 from http.client import HTTPConnection
 
-from config import FLASK_SECRET_KEY, RYFMACH_JINJA_PORT
+from config import (
+    FLASK_SECRET_KEY,
+    PUBLIC_BASE_URL,
+    RYFMACH_API_HOST,
+    RYFMACH_API_PORT,
+    RYFMACH_APP_LOG_PATH,
+    RYFMACH_JINJA_PORT,
+)
 
 API_PATHS = {
     "rhymes",
@@ -27,12 +34,8 @@ app = Flask(__name__,
             template_folder='../frontend/static/templates')
 app.config['SECRET_KEY'] = FLASK_SECRET_KEY
 
-app_file_handler = RotatingFileHandler(
-    "logs/app.log",
-    maxBytes=1 * 1024 * 1024,  # 1 MB
-    backupCount=10,
-    encoding="utf-8",
-)
+RYFMACH_APP_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+app_file_handler = WatchedFileHandler(RYFMACH_APP_LOG_PATH, encoding="utf-8")
 
 app_file_handler.setLevel(logging.INFO)
 app_file_handler.setFormatter(
@@ -56,7 +59,7 @@ def rhyme_page():
         page_description="Рыфмач. Рыфмы на беларускай мове, пошук рыфм для вершаў. Рифмы на белорусском языке, поиск рифм для стихотворений.",
         input_word=input_word_info["word"],
         add_search_filter_button=True,
-        canonical_url="https://ryfmach.online"
+        canonical_url=PUBLIC_BASE_URL
     )
 
 
@@ -70,7 +73,7 @@ def phonetics_page():
         page_description="Рыфмач. Фанетычны разбор і транскрыпцыі на беларускай мове. Фонетический разбор и транскрипции на белорусском языке.",
         input_word=input_word_info["word"],
         add_search_filter_button=False,
-        canonical_url="https://ryfmach.online/phonetics"
+        canonical_url=f"{PUBLIC_BASE_URL}/phonetics"
     )
 
 
@@ -84,7 +87,7 @@ def morphemics_page():
         page_description="Рыфмач. Марфемны і словаўтваральны разбор, разбор па складзе. Морфемный разбор, разбор слова по составу.",
         input_word=input_word_info["word"],
         add_search_filter_button=False,
-        canonical_url="https://ryfmach.online/morphemics"
+        canonical_url=f"{PUBLIC_BASE_URL}/morphemics"
     )
 
 
@@ -93,7 +96,11 @@ def proxy_api(api_path):
     if api_path not in API_PATHS:
         return jsonify({"error": "Not found"}), 404
 
-    connection = HTTPConnection("127.0.0.1", 8081, timeout=30)
+    connection = HTTPConnection(
+        RYFMACH_API_HOST,
+        RYFMACH_API_PORT,
+        timeout=30,
+    )
 
     try:
         connection.request(
