@@ -7,6 +7,28 @@ die() {
     exit 1
 }
 
+resolve_account_home() {
+    local passwd_entry=""
+    local passwd_home=""
+
+    if [[ -n "${HOME:-}" && -d "$HOME" ]]; then
+        ACCOUNT_HOME="$(cd -- "$HOME" && pwd -P)"
+    elif command -v getent >/dev/null 2>&1; then
+        passwd_entry="$(getent passwd "$EUID" || true)"
+        IFS=: read -r _ _ _ _ _ passwd_home _ <<<"$passwd_entry"
+        [[ -n "$passwd_home" && -d "$passwd_home" ]] ||
+            die "cannot determine the account home directory"
+        ACCOUNT_HOME="$(cd -- "$passwd_home" && pwd -P)"
+    else
+        die "HOME is unset and getent is unavailable"
+    fi
+
+    # Cron implementations may omit HOME. Export the resolved value for pip,
+    # Gunicorn, and all other child processes as well as these scripts.
+    HOME="$ACCOUNT_HOME"
+    export ACCOUNT_HOME HOME
+}
+
 resolve_site() {
     local site_argument="${1:-}"
     local env_argument="${2:-}"
@@ -14,9 +36,11 @@ resolve_site() {
     [[ -n "$site_argument" ]] || die "site directory is required"
     [[ -d "$site_argument" ]] || die "site directory does not exist: $site_argument"
 
+    resolve_account_home
+
     SITE_DIR="$(cd -- "$site_argument" && pwd -P)"
     SITE_NAME="$(basename -- "$SITE_DIR")"
-    ENV_FILE="${env_argument:-$HOME/config/$SITE_NAME.env}"
+    ENV_FILE="${env_argument:-$ACCOUNT_HOME/config/$SITE_NAME.env}"
     STATE_DIR="$SITE_DIR/.run"
     RELEASE_LINK="$SITE_DIR/Ryfmach"
     PYTHON_BIN="$SITE_DIR/.venv/bin/python"

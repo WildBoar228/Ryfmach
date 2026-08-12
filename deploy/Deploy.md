@@ -234,6 +234,17 @@ Start a detached site from SSH:
 ~/bin/ryfmach-deploy/start-site.sh ~/www/ryfmach.xyz
 ```
 
+For a crontab `@reboot` entry, use absolute paths rather than `~`:
+
+```cron
+@reboot env -u SCRIPT_NAME /var/www/h198451/data/bin/ryfmach-deploy/start-site.sh /var/www/h198451/data/www/ryfmach.by
+```
+
+Cron may omit `HOME`; the scripts recover the account home from the system
+passwd entry and export it to the site processes. Absolute command arguments
+are still recommended because tilde expansion depends on the cron command
+shell and is not performed inside quoted strings.
+
 If the hosting panel can execute a shell command and expects the master to stay
 in the foreground, configure it to run:
 
