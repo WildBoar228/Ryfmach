@@ -19,6 +19,9 @@ resolve_site "$site_argument" "$env_argument"
 RELEASE_TARGET="$(cd -- "$release_argument" && pwd -P)"
 [[ -f "$RELEASE_TARGET/python/main.py" ]] ||
     die "release has no python/main.py: $RELEASE_TARGET"
+[[ -f "$RELEASE_TARGET/python/requirements.txt" ]] ||
+    die "release has no python/requirements.txt: $RELEASE_TARGET"
+[[ -x "$PYTHON_BIN" ]] || die "site Python does not exist: $PYTHON_BIN"
 
 mkdir -p "$STATE_DIR"
 exec 8>"$STATE_DIR/deploy.lock"
@@ -48,6 +51,9 @@ if [[ -L "$switch_link" ]]; then
 elif [[ -e "$switch_link" ]]; then
     die "$switch_link exists but is not a symlink"
 fi
+
+"$PYTHON_BIN" -m pip install \
+    --requirement "$RELEASE_TARGET/python/requirements.txt"
 
 switch_directory="$(dirname -- "$switch_link")"
 temporary_link="$switch_directory/.$(basename -- "$switch_link").$$.tmp"

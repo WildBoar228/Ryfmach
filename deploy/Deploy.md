@@ -29,6 +29,7 @@ All paths below are inside the hosting account's home directory.
 │   └── ryfmach.xyz/
 ├── bin/
 │   └── ryfmach-deploy/
+│       ├── install-release.sh
 │       ├── restart-site.sh
 │       ├── site-common.sh
 │       ├── site-runner.sh
@@ -81,7 +82,7 @@ release-directory/
 │   ├── config.py
 │   ├── main.py
 │   └── requirements.txt
-├── wheelhouse/
+├── .env.example
 ├── VERSION
 └── SHA256SUMS
 ```
@@ -216,7 +217,8 @@ when the resolved release is `~/releases/maintenance`.
 Install all files from `deploy/scripts/` together, for example in
 `~/bin/ryfmach-deploy/`, and preserve their executable permissions. The scripts
 require Bash 4.3 or newer plus GNU `flock`, `setsid`, `readlink`, and `mv`, all
-normally supplied by the EL9 base system.
+normally supplied by the EL9 base system. `install-release.sh` also requires
+Python 3, `file`, `ldd`, and `sha256sum`.
 
 Start a detached site from SSH:
 
@@ -266,6 +268,22 @@ produced archive must have a SHA-256 checksum.
 
 On the production server:
 
+```bash
+~/bin/ryfmach-deploy/install-release.sh \
+    ~/incoming/ryfmach-COMMIT-el9-x86_64.tar.gz
+```
+
+Keep the workflow-generated `.tar.gz.sha256` beside the archive. The installer
+derives the release-directory name from the archive's single top-level
+directory. An optional second argument overrides that name. Set
+`RYFMACH_RELEASES_DIR` only when releases do not live in `~/releases`.
+
+The installer holds the deployment lock and performs checks 3 through 8 below
+in a temporary directory. It rejects links and unsafe paths in the archive,
+then renames the validated directory into place atomically. It never changes a
+site symlink, starts a process, copies a site environment, or overwrites an
+existing release.
+
 1. Acquire a deployment lock so two deployments cannot run concurrently.
 2. Upload the archive into a temporary incoming directory.
 3. Verify the archive checksum.
@@ -275,12 +293,25 @@ On the production server:
 6. Verify that `bin/ryfmach` is executable.
 7. Run `ldd bin/ryfmach` and reject the release if any library is
    `not found`.
-8. Verify that the maximum required GLIBC and GLIBCXX versions are supported by
-   the server.
-9. Verify that all required Python, frontend, and data files are present.
-10. Install pinned Python dependencies from the bundled wheelhouse using
-    `pip --no-index`. Do not download dependencies from the internet during
-    production activation.
+8. Verify that all required Python, frontend, and data files are present.
+9. Switch the site with `switch-site-release.sh`. Before changing the release
+   symlink, it installs the candidate's `python/requirements.txt` into the
+   site's existing `.venv` using the configured package index.
+
+For example:
+
+```bash
+~/bin/ryfmach-deploy/switch-site-release.sh \
+    ~/www/ryfmach.xyz \
+    ~/releases/ryfmach-COMMIT-el9-x86_64
+```
+
+The switch may download packages, so production dependency installation
+requires outbound network access. If installation fails, the release symlink
+is not changed. The release installer still runs `ldd` to reject immediately
+missing shared libraries, but it does not compare GLIBC or GLIBCXX symbol
+versions. Binary ABI compatibility is therefore confirmed when the candidate
+site is started and tested.
 
 The current per-site virtual environments are acceptable while dependencies
 remain backward-compatible, but mutating a shared venv can break rollback. If
