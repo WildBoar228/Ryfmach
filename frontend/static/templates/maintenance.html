@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Рыфмач часова недаступны праз тэхнічныя працы.">
+    {% if is_test_site %}<meta name="robots" content="noindex">{% endif %}
     <link rel="stylesheet" href="{{url_for('static', filename='css/style.css') + '?ver=1.5.4'}}">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='public/favicon.ico') }}" type="image/x-icon">
     <title>Тэхнічныя працы — Рыфмач</title>
 </head>
 <body class="maintenance-page">

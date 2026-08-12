@@ -4,11 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="{{ page_description }}">
+    {% if is_test_site %}<meta name="robots" content="noindex">{% endif %}
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="{{url_for('static', filename='css/style.css') + '?ver=1.5.3'}}">
     {% block styles %}{% endblock %}
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='public/favicon.ico') }}" type="image/x-icon">
     <link rel="canonical" href="{{ canonical_url }}">
     <title>{{ title }}</title>
 </head>
@@ -24,8 +25,8 @@
 </script>
 <!-- Google tag (gtag.js) -->
  
-    <body>
-        <nav class="main-navbar">
+<body>
+    <nav class="main-navbar">
         <button type="button" class="nav-button dull-button" data-bs-toggle="offcanvas" data-bs-target="#links-offcanvas" aria-controls="links-offcanvas" aria-label="Адкрыць меню">
             <i id="filters-icon" class="fa fa-bars"></i>
         </button>

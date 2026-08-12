@@ -78,6 +78,8 @@ tar --extract --gzip --file "$archive" --directory "$stage_dir" \
 
 required_files=(
     "bin/ryfmach"
+    "frontend/static/public/favicon.ico"
+    "frontend/static/public/sitemap.xml"
     "frontend/static/templates/index.html"
     "python/main.py"
     "python/requirements.txt"

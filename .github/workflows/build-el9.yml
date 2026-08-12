@@ -115,6 +115,8 @@ jobs:
           required_files=(
             bin/ryfmach
             data/sound_compatibility.tsv
+            frontend/static/public/favicon.ico
+            frontend/static/public/sitemap.xml
             frontend/static/templates/index.html
             python/config.py
             python/main.py

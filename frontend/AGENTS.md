@@ -12,8 +12,9 @@ package, bundler, or standalone frontend test command.
   `phonetics.js`, and `morphemics.js`.
 - `static/css/` contains shared styles in `style.css` and page-specific styles
   in `phonetics.css` and `morphemics.css`.
-- `static/img/` and `favicon.ico` are served assets. Preserve the existing
-  image paths used by templates and CSS.
+- `static/img/` contains application images. `static/public/` contains files
+  exposed through the Flask public-file route, including `favicon.ico` and
+  `sitemap.xml`. Preserve the existing image paths used by templates and CSS.
 
 The pages use Bootstrap 5, jQuery 3.7.1, and Font Awesome from CDNs. Keep
 external dependency versions and SRI attributes in sync when changing them.

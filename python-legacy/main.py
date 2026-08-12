@@ -18,6 +18,7 @@ from config import (
     RYFMACH_API_HOST,
     RYFMACH_API_PORT,
     RYFMACH_APP_LOG_PATH,
+    RYFMACH_IS_TEST_SITE,
     RYFMACH_JINJA_PORT,
 )
 
@@ -33,6 +34,7 @@ app = Flask(__name__,
             static_folder="../frontend/static",
             template_folder='../frontend/static/templates')
 app.config['SECRET_KEY'] = FLASK_SECRET_KEY
+PUBLIC_DIRECTORY = os.path.join(app.static_folder, "public")
 
 RYFMACH_APP_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 app_file_handler = WatchedFileHandler(RYFMACH_APP_LOG_PATH, encoding="utf-8")
@@ -47,6 +49,11 @@ app_file_handler.setFormatter(
 
 app.logger.setLevel(logging.INFO)
 app.logger.addHandler(app_file_handler)
+
+
+@app.context_processor
+def site_context():
+    return {"is_test_site": RYFMACH_IS_TEST_SITE}
 
 
 @app.route('/')
@@ -124,16 +131,18 @@ def proxy_api(api_path):
         connection.close()
 
 
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static'),
-                               'favicon.ico', mimetype='image/x-icon')
-
-
-@app.route('/sitemap')
+@app.get('/sitemap')
 def sitemap():
-    return send_from_directory(os.path.join(app.root_path, 'static'),
-                               'sitemap.xml', mimetype='application/xml')
+    return send_from_directory(
+        PUBLIC_DIRECTORY,
+        'sitemap.xml',
+        mimetype='application/xml',
+    )
+
+
+@app.get("/<path:filename>")
+def public_file(filename):
+    return send_from_directory(PUBLIC_DIRECTORY, filename)
 
 
 if __name__ == '__main__':

@@ -76,6 +76,9 @@ release-directory/
 │       ├── css/
 │       ├── img/
 │       ├── js/
+│       ├── public/
+│       │   ├── favicon.ico
+│       │   └── sitemap.xml
 │       └── templates/
 ├── python/
 │   ├── config.py
@@ -129,6 +132,7 @@ RHYME_LIKES_DB_PATH=/home/USERNAME/db/ryfmach.by/RhymeLikes.db
 
 FLASK_SECRET_KEY=replace-with-a-persistent-random-production-secret
 PUBLIC_BASE_URL=https://ryfmach.by
+RYFMACH_IS_TEST_SITE=false
 
 RYFMACH_APP_LOG_PATH=/home/USERNAME/logs/ryfmach.by/app.log
 RYFMACH_API_LOG_PATH=/home/USERNAME/logs/ryfmach.by/api.log
@@ -153,6 +157,7 @@ RHYME_LIKES_DB_PATH=/home/USERNAME/db/ryfmach.xyz/RhymeLikes.db
 
 FLASK_SECRET_KEY=replace-with-a-persistent-random-test-secret
 PUBLIC_BASE_URL=https://ryfmach.xyz
+RYFMACH_IS_TEST_SITE=true
 
 RYFMACH_APP_LOG_PATH=/home/USERNAME/logs/ryfmach.xyz/app.log
 RYFMACH_API_LOG_PATH=/home/USERNAME/logs/ryfmach.xyz/api.log
@@ -165,6 +170,8 @@ RYFMACH_SITE_STOP_TIMEOUT=20
 
 Production and test must use different API ports, Flask secrets, mutable
 databases, and log paths. The read-only dictionary database may be shared.
+`RYFMACH_IS_TEST_SITE=true` adds a `noindex` robots meta tag to HTML
+pages; production must set it to `false`.
 
 Flask must connect to `RYFMACH_API_HOST:RYFMACH_API_PORT`; it must not
 hard-code port 8081. Canonical URLs and sitemap generation should use
