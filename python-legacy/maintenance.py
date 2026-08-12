@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, make_response, render_template
 
 from config import RYFMACH_IS_TEST_SITE, RYFMACH_JINJA_PORT
 
@@ -13,10 +13,15 @@ app = Flask(
 @app.get("/")
 @app.get("/<path:path>")
 def reconstruct_page(path: str = ""):
-    return render_template(
-        "maintenance.html",
-        is_test_site=RYFMACH_IS_TEST_SITE,
+    response = make_response(
+        render_template(
+            "maintenance.html",
+            is_test_site=RYFMACH_IS_TEST_SITE,
+        ),
+        503,
     )
+    response.headers["Retry-After"] = "300"
+    return response
 
 
 if __name__ == "__main__":

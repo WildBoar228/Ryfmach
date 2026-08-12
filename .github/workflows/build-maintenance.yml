@@ -1,0 +1,122 @@
+name: Build maintenance release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-maintenance:
+    runs-on: ubuntu-24.04
+
+    container:
+      image: almalinux:9
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Install EL9 packaging tools
+        run: |
+          dnf install -y \
+            ca-certificates \
+            git \
+            gzip \
+            python3.12 \
+            python3.12-pip \
+            tar
+          python3.12 --version
+
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Assemble maintenance release
+        run: |
+          release_dir=stage/maintenance
+
+          mkdir -p \
+            "$release_dir/frontend/static/css" \
+            "$release_dir/frontend/static/img" \
+            "$release_dir/frontend/static/public" \
+            "$release_dir/frontend/static/templates" \
+            "$release_dir/python" \
+            dist
+
+          install -m 0644 \
+            python-legacy/maintenance.py \
+            "$release_dir/python/main.py"
+
+          install -m 0644 \
+            python-legacy/config.py \
+            python-legacy/requirements.txt \
+            "$release_dir/python/"
+
+          install -m 0644 \
+            frontend/static/css/style.css \
+            "$release_dir/frontend/static/css/style.css"
+
+          install -m 0644 \
+            frontend/static/img/logo.png \
+            "$release_dir/frontend/static/img/logo.png"
+
+          install -m 0644 \
+            frontend/static/public/favicon.ico \
+            "$release_dir/frontend/static/public/favicon.ico"
+
+          install -m 0644 \
+            frontend/static/templates/maintenance.html \
+            "$release_dir/frontend/static/templates/maintenance.html"
+
+          install -m 0644 \
+            .env.example \
+            "$release_dir/.env.example"
+
+          printf '%s\n' "$GITHUB_SHA" > "$release_dir/VERSION"
+
+      - name: Test maintenance release
+        run: |
+          python3.12 -m venv maintenance-test
+          maintenance-test/bin/python -m pip install \
+            --requirement stage/maintenance/python/requirements.txt
+
+          PYTHONPATH=stage/maintenance/python \
+          RHYME_LIKES_DB_PATH=/tmp/RhymeLikes.db \
+          SLOUNIK_DB_PATH=/tmp/Slounik5.db \
+          FLASK_SECRET_KEY=maintenance-test-secret \
+          PUBLIC_BASE_URL=https://example.invalid \
+          RYFMACH_IS_TEST_SITE=false \
+          RYFMACH_API_HOST=127.0.0.1 \
+          RYFMACH_API_PORT=8081 \
+          RYFMACH_APP_LOG_PATH=/tmp/maintenance-app.log \
+          RYFMACH_JINJA_PORT=8082 \
+          maintenance-test/bin/python - <<'PY'
+          from main import app
+
+          client = app.test_client()
+          response = client.get("/")
+          assert response.status_code == 503
+          assert response.headers["Retry-After"] == "300"
+          assert "Тэхнічныя працы".encode() in response.data
+          assert client.get("/static/css/style.css").status_code == 200
+          assert client.get("/static/img/logo.png").status_code == 200
+          assert client.get("/static/public/favicon.ico").status_code == 200
+          PY
+
+      - name: Package maintenance release
+        run: |
+          test ! -e stage/maintenance/bin/ryfmach
+          tar -C stage -czf dist/maintenance.tar.gz maintenance
+          (
+            cd dist
+            sha256sum maintenance.tar.gz > maintenance.tar.gz.sha256
+          )
+
+      - name: Upload maintenance artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ryfmach-maintenance-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14

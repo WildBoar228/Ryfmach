@@ -76,21 +76,36 @@ tar --extract --gzip --file "$archive" --directory "$stage_dir" \
     --strip-components 1 --no-same-owner --no-same-permissions \
     --delay-directory-restore
 
-required_files=(
-    "bin/ryfmach"
-    "frontend/static/public/favicon.ico"
-    "frontend/static/public/sitemap.xml"
-    "frontend/static/templates/index.html"
-    "python/main.py"
-    "python/requirements.txt"
-)
+if [[ "$release_name" == "maintenance" ]]; then
+    required_files=(
+        "frontend/static/css/style.css"
+        "frontend/static/img/logo.png"
+        "frontend/static/public/favicon.ico"
+        "frontend/static/templates/maintenance.html"
+        "python/config.py"
+        "python/main.py"
+        "python/requirements.txt"
+        "VERSION"
+    )
+else
+    required_files=(
+        "bin/ryfmach"
+        "frontend/static/public/favicon.ico"
+        "frontend/static/public/sitemap.xml"
+        "frontend/static/templates/index.html"
+        "python/main.py"
+        "python/requirements.txt"
+    )
+fi
 for required_file in "${required_files[@]}"; do
     [[ -f "$stage_dir/$required_file" ]] ||
         die "release is missing required file: $required_file"
 done
 
-[[ -x "$stage_dir/bin/ryfmach" ]] ||
-    die "release binary is not executable"
+if [[ "$release_name" != "maintenance" ]]; then
+    [[ -x "$stage_dir/bin/ryfmach" ]] ||
+        die "release binary is not executable"
+fi
 
 mv -- "$stage_dir" "$release_dir"
 stage_dir=""

@@ -95,6 +95,10 @@ can be used by test and production at the same time.
 The maintenance release contains the minimum Python and static files needed to
 serve `maintenance.html`. Its application must return HTTP 503 and a
 `Retry-After` header for application pages. It does not start the C++ API.
+Build it manually from GitHub Actions with the `Build maintenance release`
+workflow. The downloaded artifact contains `maintenance.tar.gz` and its
+checksum; install it with `install-release.sh` so its directory name remains
+exactly `maintenance`, which is how `site-runner.sh` identifies it.
 
 ## Site environment
 
