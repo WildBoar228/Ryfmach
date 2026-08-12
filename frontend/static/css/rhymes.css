@@ -1,0 +1,130 @@
+.rhyme-pronunciation-dialog{
+    width: min(100% - 24px, 680px);
+    max-width: 680px;
+    margin-right: auto;
+    margin-left: auto;
+}
+
+.rhyme-pronunciation-instructions{
+    margin-bottom: 16px;
+    text-align: left;
+}
+
+.rhyme-pronunciation-picker{
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.rhyme-pronunciation-options{
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.rhyme-pronunciation-option-button{
+    display: grid;
+    grid-template-columns: 1rem minmax(0, 1fr);
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: black;
+    text-align: left;
+}
+
+.rhyme-pronunciation-option-button:hover{
+    background-color: rgb(255, 253, 239);
+}
+
+.rhyme-pronunciation-option-button:focus-visible{
+    outline: 3px solid var(--dark-primary-color);
+    outline-offset: 1px;
+}
+
+.rhyme-pronunciation-bullet{
+    font: bold 1.25rem/1.45 Arial, sans-serif;
+    text-align: center;
+}
+
+.rhyme-pronunciation-option-text{
+    min-width: 0;
+    font: normal 1.25rem/1.45 Arial, sans-serif;
+    overflow-wrap: anywhere;
+}
+
+.rhyme-pronunciation-option-text .accent-vowel{
+    color: firebrick;
+    font-weight: bold;
+}
+
+.rhyme-pronunciation-correction{
+    display: block;
+    margin-top: 2px;
+    color: rgb(96, 96, 96);
+    font-size: 0.95rem;
+}
+
+.rhyme-pronunciation-footer{
+    gap: 8px;
+}
+
+.selected-pronunciation-control{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: min(100% - 32px, 760px);
+    margin-top: 12px;
+}
+
+.selected-pronunciation-label{
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px){
+    .rhyme-pronunciation-dialog{
+        width: calc(100% - 16px);
+        margin: 8px auto;
+    }
+
+    .rhyme-pronunciation-option-button{
+        grid-template-columns: 0.9rem minmax(0, 1fr);
+        gap: 6px;
+        padding: 9px 6px;
+    }
+
+    .rhyme-pronunciation-option-text{
+        font-size: 1.1rem;
+        line-height: 1.4;
+    }
+
+    .rhyme-pronunciation-footer{
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .rhyme-pronunciation-footer .modest-button,
+    .rhyme-pronunciation-footer .dull-button{
+        width: 100%;
+    }
+
+    .selected-pronunciation-control{
+        align-items: stretch;
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+    }
+
+    .selected-pronunciation-control .modest-button{
+        align-self: center;
+    }
+}

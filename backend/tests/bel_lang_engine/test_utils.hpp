@@ -88,10 +88,10 @@ inline std::vector<int> RhymeWordIds(
 }
 
 inline std::filesystem::path SharedSlounikTestDatabasePath() {
-    constexpr int kSchemaVersion = 1;
+    constexpr int kSchemaVersion = 4;
     const auto path =
         std::filesystem::temp_directory_path() /
-        "ryfmach_shared_slounik_test_v1.sqlite";
+        "ryfmach_shared_slounik_test_v4.sqlite";
 
     SQLite::Database db(path, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
     db.setBusyTimeout(10000);
@@ -156,6 +156,26 @@ inline std::filesystem::path SharedSlounikTestDatabasePath() {
     InsertWord(db, 4, "дзень", 4, 1, 2, SoundHashesFor("дзень", 2));
     InsertWord(db, 9, "гуляць", 9, 2, 3, SoundHashesFor("гуляць", 3));
     InsertWord(db, 10, "мыцца", 10, 2, 4, SoundHashesFor("мыцца", 4));
+    InsertWord(db, 11, "ласка", 11, 1, 1,
+        {200001, 200002, 200003, 200004});
+    InsertWord(db, 12, "ласка", 12, 2, 1,
+        {200011, 200012, 200013, 200014});
+    InsertWord(db, 13, "замкі", 13, 1, 1,
+        {200021, 200022, 200023, 200024});
+    InsertWord(db, 14, "замкі", 14, 1, 4,
+        {200031, 200032, 200033, 200034});
+    InsertWord(db, 15, "мука", 15, 1, 1,
+        {200041, 200042, 200043, 200044});
+    InsertWord(db, 16, "мука", 16, 1, 3,
+        {200051, 200052, 200053, 200054});
+    InsertWord(db, 17, "мўка", 17, 1, 1,
+        {200061, 200062, 200063, 200064});
+    InsertWord(db, 18, "мўка", 18, 1, 3,
+        {200071, 200072, 200073, 200074});
+    InsertWord(db, 19, "сена", 19, 1, 1,
+        {200081, 200082, 200083, 200084});
+    InsertWord(db, 20, "сёна", 20, 1, 1,
+        {200091, 200092, 200093, 200094});
 
     InsertWord(
         db, 5, "рата", 5, 2, 1,
@@ -170,7 +190,7 @@ inline std::filesystem::path SharedSlounikTestDatabasePath() {
         db, 8, "дата", 8, 1, 1,
         {100030, 100031, 100032, khata_hashes[3]});
 
-    db.exec("PRAGMA user_version = 1");
+    db.exec("PRAGMA user_version = 4");
     db.exec("COMMIT");
 
     return path;
