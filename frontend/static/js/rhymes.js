@@ -95,11 +95,6 @@ function bind_events() {
         event.preventDefault();
         start_new_search();
     });
-    searchInputRhyme.addEventListener("input", () => {
-        const editedWord = clean_input_word(searchInputRhyme.value);
-        if (currentWord && editedWord !== currentWord)
-            reset_search_state();
-    });
     pronunciationOptions.addEventListener("click", (event) => {
         const button = event.target.closest("[data-pronunciation-index]");
         if (button)
@@ -706,9 +701,6 @@ function open_manual_accent_picker(isUnknownWord) {
         render_status("У гэтым слове няма галосных", "danger");
         return;
     }
-
-    if (!isUnknownWord)
-        render_status("Укажыце націскную галосную", "info");
 
     set_search_state(RhymeSearchState.needsChoice);
     letterButtonsBlock.replaceChildren();

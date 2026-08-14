@@ -1,15 +1,3 @@
-.rhyme-pronunciation-dialog{
-    width: min(100% - 24px, 680px);
-    max-width: 680px;
-    margin-right: auto;
-    margin-left: auto;
-}
-
-.rhyme-pronunciation-instructions{
-    margin-bottom: 16px;
-    text-align: left;
-}
-
 .rhyme-pronunciation-picker{
     min-width: 0;
     margin: 0;
@@ -72,10 +60,6 @@
     font-size: 0.95rem;
 }
 
-.rhyme-pronunciation-footer{
-    gap: 8px;
-}
-
 .selected-pronunciation-control{
     display: flex;
     align-items: center;
@@ -91,11 +75,6 @@
 }
 
 @media (max-width: 640px){
-    .rhyme-pronunciation-dialog{
-        width: calc(100% - 16px);
-        margin: 8px auto;
-    }
-
     .rhyme-pronunciation-option-button{
         grid-template-columns: 0.9rem minmax(0, 1fr);
         gap: 6px;
@@ -105,16 +84,6 @@
     .rhyme-pronunciation-option-text{
         font-size: 1.1rem;
         line-height: 1.4;
-    }
-
-    .rhyme-pronunciation-footer{
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .rhyme-pronunciation-footer .modest-button,
-    .rhyme-pronunciation-footer .dull-button{
-        width: 100%;
     }
 
     .selected-pronunciation-control{

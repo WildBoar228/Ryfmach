@@ -82,6 +82,30 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
+    gap: 4px;
+}
+
+.word-choice-dialog{
+    width: min(100% - 24px, 680px);
+    max-width: 680px;
+    margin-right: auto;
+    margin-left: auto;
+}
+
+.word-choice-instructions{
+    margin-bottom: 16px;
+    text-align: left;
+}
+
+.word-choice-footer{
+    gap: 8px;
+}
+
+.manual-accent-picker{
+    min-width: 0;
+    margin: 0;
+    padding: 8px 0;
+    border: 0;
 }
 
 .search-block{
@@ -117,7 +141,7 @@
     min-height: 44px;
     border-radius: 22px;
     padding: 0 10px 0 10px;
-    background-color: gray;
+    background-color: #aaa;
     color: white;
     display: flex;
     align-items: center;
@@ -405,43 +429,47 @@
 }
 
 .square-letter-label{
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 44px;
     height: 44px;
     border-radius: 10px;
+    padding: 0;
     text-align: center;
     font: normal 16pt Arial, sans-serif;
+    line-height: 1;
 }
 
 .square-letter-button-outline{
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 44px;
     height: 44px;
     border-radius: 10px;
     border: 1px firebrick;
+    padding: 0;
     color: black;
     text-align: center;
     font: normal 16pt Arial, sans-serif;
+    line-height: 1;
 }
 
 .square-letter-button-chosen{
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 44px;
     height: 44px;
     border-radius: 10px;
     border: 1px black;
     background-color: firebrick;
+    padding: 0;
     color: white;
     text-align: center;
     font: normal 16pt Arial, sans-serif;
-}
-
-.close-button{
-    width: 30px;
-    height: 30px;
-    border-radius: 10px;
-    border: 1px black;
-    background-color: firebrick;
-    color: white;
-    text-align: center;
-    font: normal 16pt Arial, sans-serif;
+    line-height: 1;
 }
 
 .footer{
@@ -681,6 +709,22 @@
         bottom: max(12px, env(safe-area-inset-bottom));
     }
 
+    .word-choice-dialog{
+        width: calc(100% - 16px);
+        margin: 8px auto;
+    }
+
+    .word-choice-footer{
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .word-choice-footer .bright-button,
+    .word-choice-footer .modest-button,
+    .word-choice-footer .dull-button{
+        width: 100%;
+    }
+
     .rhyme-word{
         font: bold 1.05rem Arial, sans-serif;
     }
@@ -709,13 +753,6 @@
         height: 44px;
         border-radius: 12px;
         font: normal 1.4rem Arial, sans-serif;
-    }
-
-    .close-button{
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
-        font: normal 1rem Arial, sans-serif;
     }
 
     .nav-links-box {
