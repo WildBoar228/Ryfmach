@@ -1,5 +1,9 @@
 {% extends "index.html" %}
 
+{% block styles %}
+    <link rel="stylesheet" href="{{url_for('static', filename='css/rhymes.css') + '?ver=1.0.1'}}">
+{% endblock %}
+
 {% block content %}
     <div class="header-block">
         <p class="greeting">
@@ -10,7 +14,9 @@
         </p>
     </div>
 
+    {% set show_word_variants_dropdown = false %}
     {% include "search_panel.html" %}
+    {% include "rhyme_pronunciation_picker.html" %}
 
     <div class="rhymes-block is-hidden" id="rhymes-block">
         <div class="center-block rhyme-count-row">
@@ -140,7 +146,7 @@
     <div class="faq-block">
         <div class="faq-item">
             <p class="mid-header"> Як працуе пошук рыфмаў? </p>
-            <p class="info-text"> Рыфмач выкарыстоўвае вялікую базу дадзеных, каб знайсці слова, якое Вы ўвялі, і вызначыць ў ім націск. Калі слоў з такім напісаннем некалькі, Вы можаце абраць любы варыянт з дапамогай блакітнай кнопкі. Пасля Рыфмач будуе транскрыпцыю і падбірае падобныя па гучанні словы. </p>
+            <p class="info-text"> Рыфмач выкарыстоўвае вялікую базу дадзеных, каб знайсці слова, якое Вы ўвялі, і вызначыць ў ім націск. Калі ёсць некалькі варыянтаў вымаўлення, Рыфмач прапануе абраць патрэбны перад паказам вынікаў. Пасля Рыфмач будуе транскрыпцыю і падбірае падобныя па гучанні словы. </p>
         </div>
         <div class="faq-item">
             <p class="mid-header"> Як знайсці рыфму да слова, якога няма ў базе? </p>
@@ -167,5 +173,5 @@
         integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
         crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js" integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q" crossorigin="anonymous"></script>
-    <script src="{{url_for('static', filename='js/rhymes.js') + '?ver=1.5.4'}}" type="text/javascript"></script>
+    <script src="{{url_for('static', filename='js/rhymes.js') + '?ver=1.7.0'}}" type="text/javascript"></script>
 {% endblock %}

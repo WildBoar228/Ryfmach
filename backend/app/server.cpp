@@ -86,23 +86,46 @@ json WordRecordToJson(const bel::WordRecord& word) {
     return result;
 }
 
-json RhymesResultToJson(const RhymesResult& result) {
-    json rhyme_groups = json::array();
-    for (const auto& rhyme_group : result.rhymes_list) {
-        json rhymes = json::array();
-        for (const auto& rhyme : rhyme_group.rhymes) {
-            rhymes.push_back(WordRecordToJson(rhyme));
-        }
+json RhymeWordVariantToJson(const RhymeWordVariant& variant) {
+    json result = {
+        {"word", variant.dictionary_entry.word},
+        {"accent", variant.dictionary_entry.accent},
+        {"exact_match", variant.exact_match},
+        {"dictionary_entry", WordRecordToJson(variant.dictionary_entry)},
+    };
+    if (variant.dictionary_entry.id != 0) {
+        result["dictionary_id"] = variant.dictionary_entry.id;
+    }
+    return result;
+}
 
-        rhyme_groups.push_back({
-            {"word_variant", WordRecordToJson(rhyme_group.word_variant)},
-            {"rhymes_data", std::move(rhymes)},
-        });
+json RhymesResultToJson(const RhymesResult& result) {
+    if (result.status == RhymeResolutionStatus::kNotFound) {
+        return {{"status", "not_found"}};
+    }
+
+    if (result.status == RhymeResolutionStatus::kNeedsChoice) {
+        json variants = json::array();
+        for (const auto& variant : result.variants) {
+            variants.push_back(RhymeWordVariantToJson(variant));
+        }
+        return {
+            {"status", "needs_choice"},
+            {"variants", std::move(variants)},
+        };
+    }
+
+    json rhymes = json::array();
+    for (const auto& rhyme : result.rhymes) {
+        rhymes.push_back(WordRecordToJson(rhyme));
     }
 
     return {
-        {"rhymes_list", std::move(rhyme_groups)},
-        {"word_found", result.word_found},
+        {"status", "resolved"},
+        {"selected_variant", result.selected_variant
+            ? RhymeWordVariantToJson(*result.selected_variant)
+            : json(nullptr)},
+        {"rhymes_data", std::move(rhymes)},
     };
 }
 
@@ -204,17 +227,19 @@ void HandleRhymesRequest(
         const json request = json::parse(req.body);
         const std::string word = request.value("word", std::string{});
         if (word.empty()) {
-            WriteJson(
-                res,
-                200,
-                {{"rhymes_list", json::array()}, {"word_found", false}});
+            WriteJson(res, 200, RhymesResultToJson({}));
             return;
         }
         ryfmach::bel::RhymeSearchFilters filters = FiltersFromJson(request);
 
         RhymesResult result;
 
-        if (request.contains("accent")) {
+        if (request.contains("dictionary_id")) {
+            const std::size_t accent = request.at("accent").get<std::size_t>();
+            const int dictionary_id = request.at("dictionary_id").get<int>();
+            common_log.info("Rhymes to \"{}\", {}, id={}", word, accent, dictionary_id);
+            result = service.FindRhymes(word, accent, dictionary_id, filters);
+        } else if (request.contains("accent")) {
             const std::size_t accent = request.at("accent").get<std::size_t>();
             common_log.info("Rhymes to \"{}\", {} ", word, accent);
             result = service.FindRhymes(word, accent, filters);

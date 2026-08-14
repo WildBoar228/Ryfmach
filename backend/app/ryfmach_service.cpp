@@ -1,7 +1,9 @@
 #include "ryfmach_service.hpp"
 
-#include <string>
+#include <algorithm>
+#include <span>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace ryfmach::app {
@@ -40,6 +42,29 @@ std::optional<std::vector<bel::Letter>> ParseInputWord(
     return letters;
 }
 
+std::vector<RhymeWordVariant> BuildRhymeWordVariants(
+    std::string_view normalized_input,
+    std::span<const bel::WordRecord> word_variants
+) {
+    std::vector<RhymeWordVariant> variants;
+    variants.reserve(word_variants.size());
+
+    for (const auto& word_variant : word_variants) {
+        variants.push_back(RhymeWordVariant{
+            .dictionary_entry = word_variant,
+            .exact_match = NormalizeInputWord(word_variant.word) ==
+                           normalized_input,
+        });
+    }
+
+    std::stable_partition(
+        variants.begin(), variants.end(),
+        [](const auto& variant) {
+            return variant.exact_match;
+        });
+    return variants;
+}
+
 } // namespace
 
 RyfmachService::RyfmachService(
@@ -60,14 +85,28 @@ RhymesResult RyfmachService::FindRhymes(
         normalized_word,
         bel::WordLookupOptions{.fix_similar_letters = true});
 
-    RhymesResult result;
-    result.word_found = !word_variants.empty();
-    result.rhymes_list.reserve(word_variants.size());
+    auto variants = BuildRhymeWordVariants(
+        normalized_word, word_variants);
+    const auto exact_variant_count = std::count_if(
+        variants.begin(), variants.end(),
+        [](const auto& variant) {
+            return variant.exact_match;
+        });
 
-    for (const auto& word_variant : word_variants) {
-        result.rhymes_list.push_back(FindRhymesForVariant(word_variant, filters));
+    RhymesResult result;
+    if (variants.empty()) {
+        return result;
+    }
+    if (exact_variant_count != 1) {
+        result.status = RhymeResolutionStatus::kNeedsChoice;
+        result.variants = std::move(variants);
+        return result;
     }
 
+    result.status = RhymeResolutionStatus::kResolved;
+    result.selected_variant = std::move(variants.front());
+    result.rhymes = FindRhymesForVariant(
+        result.selected_variant->dictionary_entry, filters);
     return result;
 }
 
@@ -82,14 +121,54 @@ RhymesResult RyfmachService::FindRhymes(
         return {};
     }
 
-    bel::WordRecord word_variant{
-        .word = normalized_word,
-        .accent = accent,
+    RhymeWordVariant word_variant{
+        .dictionary_entry = bel::WordRecord{
+            .word = normalized_word,
+            .accent = accent,
+        },
+        .exact_match = true,
     };
 
     RhymesResult result;
-    result.word_found = true;
-    result.rhymes_list.push_back(FindRhymesForVariant(word_variant, filters));
+    result.status = RhymeResolutionStatus::kResolved;
+    result.selected_variant = std::move(word_variant);
+    result.rhymes = FindRhymesForVariant(
+        result.selected_variant->dictionary_entry, filters);
+    return result;
+}
+
+RhymesResult RyfmachService::FindRhymes(
+    std::string_view word,
+    std::size_t accent,
+    int dictionary_id,
+    const bel::RhymeSearchFilters& filters
+) const {
+    const std::string normalized_word = NormalizeInputWord(word);
+    const auto letters = ParseInputWord(normalized_word);
+    if (!letters || accent >= letters->size() ||
+        !bel::IsVowel((*letters)[accent]) || dictionary_id <= 0) {
+        return {};
+    }
+
+    const auto word_variants = slounik_.FindWords(normalized_word);
+    const auto selected = std::find_if(
+        word_variants.begin(), word_variants.end(),
+        [dictionary_id, accent, &normalized_word](const auto& candidate) {
+            return candidate.id == dictionary_id &&
+                   candidate.word == normalized_word &&
+                   candidate.accent == accent;
+        });
+    if (selected == word_variants.end()) {
+        return {};
+    }
+
+    RhymesResult result;
+    result.status = RhymeResolutionStatus::kResolved;
+    result.selected_variant = RhymeWordVariant{
+        .dictionary_entry = *selected,
+        .exact_match = true,
+    };
+    result.rhymes = FindRhymesForVariant(*selected, filters);
     return result;
 }
 
@@ -160,27 +239,25 @@ int RyfmachService::UpdateRhymeLikeScore(
         request_word, request_stress, rhyme_word, rhyme_stress, delta);
 }
 
-RhymeGroup RyfmachService::FindRhymesForVariant(
+std::vector<bel::WordRecord> RyfmachService::FindRhymesForVariant(
     const bel::WordRecord& word_variant,
     const bel::RhymeSearchFilters& filters
 ) const {
-    RhymeGroup rhyme_group;
-    rhyme_group.word_variant = word_variant;
-
     const auto rhymes = slounik_.FindRhymes(
-        word_variant.word,
-        word_variant.accent,
+        word_variant,
         filters,
         kMaxRhymesPerVariant);
-    rhyme_group.rhymes.reserve(rhymes.size());
+
+    std::vector<bel::WordRecord> rhyme_words;
+    rhyme_words.reserve(rhymes.size());
 
     for (const auto& rhyme : rhymes) {
         if (const auto rhyme_word = slounik_.GetWordById(rhyme.word_id)) {
-            rhyme_group.rhymes.push_back(std::move(*rhyme_word));
+            rhyme_words.push_back(std::move(*rhyme_word));
         }
     }
 
-    return rhyme_group;
+    return rhyme_words;
 }
 
 std::optional<PhoneticAnalysis> RyfmachService::AnalyzePhoneticsForVariant(

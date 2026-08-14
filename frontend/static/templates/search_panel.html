@@ -18,30 +18,34 @@
 
     <div id="search-status-info" class="center-block" role="status" aria-live="polite"> </div>
 
-    <div class="modal" tabindex="-1" id="manual-accent-modal">
-        <div class="modal-dialog">
+    <div class="modal fade" tabindex="-1" id="manual-accent-modal" aria-labelledby="manual-accent-title" aria-describedby="manual-accent-instructions">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable word-choice-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title info-text">Укажыце націскную галосную</h5>
-                    <button type="button" class="close-button" data-bs-dismiss="modal" aria-label="Close"><i class="fa fa-times" aria-hidden="true"></i></button>
+                    <h2 class="modal-title mid-header" id="manual-accent-title">Укажыце націскную галосную</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыць"></button>
                 </div>
                 <div class="modal-body">
-
-                    <div class="center-block" id="manual-accent-block">
-                        <div class="letter-buttons-block" id="letter-buttons-block">
-                            
+                    <p class="info-text word-choice-instructions" id="manual-accent-instructions">
+                        Абярыце галосную, на якую падае націск.
+                    </p>
+                    <fieldset class="manual-accent-picker">
+                        <legend class="visually-hidden">Націскная галосная</legend>
+                        <div class="center-block" id="manual-accent-block">
+                            <div class="letter-buttons-block" id="letter-buttons-block">
+                            </div>
                         </div>
-                    </div>
-                    
+                    </fieldset>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="dull-button rhyme-word" data-bs-dismiss="modal">Адмена</button>
+                <div class="modal-footer word-choice-footer">
                     <button id="search-accent-button" type="button" class="bright-button rhyme-word">Далей</button>
+                    <button type="button" class="dull-button rhyme-word" data-bs-dismiss="modal">Адмена</button>
                 </div>
             </div>
         </div>
     </div>
 
+    {% if show_word_variants_dropdown | default(true) %}
     <div id="word-variants-block" class="center-block hidden-visibility">
         <div class="dropdown">
             <button class="dropdown-light rhyme-word" type="button" id="dropdown-choose-word" data-bs-toggle="dropdown" aria-expanded="false">
@@ -55,5 +59,6 @@
             <p id="search-status-text" class="search-status-text">Нічога няма</p>
         </div>
     </div>
+    {% endif %}
 
     <div id="error-msg"></div>

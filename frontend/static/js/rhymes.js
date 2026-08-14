@@ -1,43 +1,68 @@
-var alphabet = "-абвгдеёжзійклмнопрстуўфхцчш'ыьэюя";
-var vowels= "аеёіоуыэюя";
+"use strict";
 
-var rhymes_response = [];
-var precalc_rhymes_html = [];
-var precalc_rhymes_count = [];
+const alphabet = "-абвгдеёжзійклмнопрстуўфхцчш'ыьэюя";
+const vowels = "аеёіоуыэюя";
 
-var w;
-var accent_index = -1;
-var filtered_parts_of_speech = [1, 1, 1, 1, 1, 1, 1];
-var filtered_only_initial = false;
-var search_mistake = -1;
+const RhymeSearchState = Object.freeze({
+    idle: "idle",
+    lookingUp: "looking_up",
+    needsChoice: "needs_choice",
+    loadingRhymes: "loading_rhymes",
+    showingResults: "showing_results",
+    error: "error",
+});
 
-const search_input_rhyme = document.getElementById("search-input");
-const search_form = document.getElementById("search-form");
-const search_button_rhyme = document.getElementById("search-button");
-const search_icon = document.getElementById("search-icon");
-const search_spinner = document.getElementById("search-spinner");
-const search_status_text = document.getElementById("search-status-text");
-const search_status_info = document.getElementById("search-status-info");
+let searchState = RhymeSearchState.idle;
+let currentWord = "";
+let accentIndex = -1;
+let selectedPronunciation = null;
+let pronunciationVariants = [];
+let rhymesResponse = null;
+let activeRhymeRequest = null;
+let requestVersion = 0;
+let openManualAccentAfterVariantModal = false;
 
-const word_variants_block = document.getElementById("word-variants-block");
-const dropdown_choose_word = document.getElementById("dropdown-choose-word");
-const dropdown_choose_word_menu = document.getElementById("dropdown-choose-word-menu");
-const rhymes_block = document.getElementById("rhymes-block");
-const rhymes_count_text = document.getElementById("rhyme-count-text");
-const rhymes_list = document.getElementById("rhymes-list");
+const searchInputRhyme = document.getElementById("search-input");
+const searchForm = document.getElementById("search-form");
+const searchButtonRhyme = document.getElementById("search-button");
+const searchIcon = document.getElementById("search-icon");
+const searchSpinner = document.getElementById("search-spinner");
+const searchStatusInfo = document.getElementById("search-status-info");
 
-const manual_accent_modal = new bootstrap.Modal(document.getElementById('manual-accent-modal'));
-const letter_buttons_block = document.getElementById("letter-buttons-block");
-const search_accent_button = document.getElementById("search-accent-button");
-const save_filters_button = document.getElementById("save-filters-button");
-const scroll_up_button = document.querySelector(".button-scroll-up");
+const pronunciationModalElement = document.getElementById("rhyme-pronunciation-modal");
+const pronunciationOptions = document.getElementById("rhyme-pronunciation-options");
+const manualPronunciationButton = document.getElementById("manual-pronunciation-button");
+const selectedPronunciationControl = document.getElementById("selected-pronunciation-control");
+const selectedPronunciationText = document.getElementById("selected-pronunciation-text");
+const changePronunciationButton = document.getElementById("change-pronunciation-button");
 
-const fa_long_arrow_left = `<i class="fa fa-long-arrow-left" aria-hidden="true"></i>`
+const rhymesBlock = document.getElementById("rhymes-block");
+const rhymesCountText = document.getElementById("rhyme-count-text");
+const rhymesList = document.getElementById("rhymes-list");
 
-function set_loading(is_loading) {
-    search_button_rhyme.disabled = is_loading;
-    search_icon.hidden = is_loading;
-    search_spinner.hidden = !is_loading;
+const pronunciationModal = new bootstrap.Modal(pronunciationModalElement);
+const manualAccentModal = new bootstrap.Modal(document.getElementById("manual-accent-modal"));
+const letterButtonsBlock = document.getElementById("letter-buttons-block");
+const searchAccentButton = document.getElementById("search-accent-button");
+const saveFiltersButton = document.getElementById("save-filters-button");
+const scrollUpButton = document.querySelector(".button-scroll-up");
+
+const faLongArrowLeft = `<i class="fa fa-long-arrow-left" aria-hidden="true"></i>`;
+
+
+function set_loading(isLoading) {
+    searchButtonRhyme.disabled = isLoading;
+    searchIcon.hidden = isLoading;
+    searchSpinner.hidden = !isLoading;
+}
+
+
+function set_search_state(nextState) {
+    searchState = nextState;
+    set_loading(
+        nextState === RhymeSearchState.lookingUp ||
+        nextState === RhymeSearchState.loadingRhymes
+    );
 }
 
 
@@ -52,147 +77,205 @@ function escape_html(value) {
 }
 
 
-function bind_events() {
-    search_form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        post_rhymes_request();
-    });
-    search_accent_button.addEventListener("click", post_rhymes_with_manual_accent);
-    save_filters_button.addEventListener("click", update_filters);
-    scroll_up_button.addEventListener("click", scroll_up);
-    rhymes_list.addEventListener("click", handle_rhyme_like_click);
+function render_status(message, level = "info") {
+    searchStatusInfo.replaceChildren();
+    if (!message)
+        return;
+
+    const alert = document.createElement("div");
+    alert.className = `alert alert-${level} info-text`;
+    alert.setAttribute("role", "alert");
+    alert.textContent = message;
+    searchStatusInfo.appendChild(alert);
 }
 
 
-function is_belarusian(word){
-    for (let char in word){
-        if (!alphabet.includes(word[char].toLowerCase()))
+function bind_events() {
+    searchForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        start_new_search();
+    });
+    pronunciationOptions.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-pronunciation-index]");
+        if (button)
+            select_variant(Number(button.dataset.pronunciationIndex));
+    });
+    pronunciationModalElement.addEventListener("shown.bs.modal", () => {
+        pronunciationOptions.querySelector("button")?.focus();
+    });
+    pronunciationModalElement.addEventListener("hidden.bs.modal", () => {
+        if (!openManualAccentAfterVariantModal)
+            return;
+        openManualAccentAfterVariantModal = false;
+        open_manual_accent_picker(false);
+    });
+    manualPronunciationButton.addEventListener("click", () => {
+        openManualAccentAfterVariantModal = true;
+        pronunciationModal.hide();
+    });
+    changePronunciationButton.addEventListener("click", change_pronunciation);
+    searchAccentButton.addEventListener("click", post_rhymes_with_manual_accent);
+    saveFiltersButton.addEventListener("click", update_filters);
+    scrollUpButton.addEventListener("click", scroll_up);
+    rhymesList.addEventListener("click", handle_rhyme_like_click);
+}
+
+
+function is_belarusian(word) {
+    for (const character of word) {
+        if (!alphabet.includes(character.toLowerCase()))
             return false;
     }
     return true;
 }
 
 
-function word_contains_vowels(word){
-    let seen_vowel = false;
-    for (let char in word)
-        if (vowels.includes(word[char]))
-            seen_vowel = true;
-    return seen_vowel;
+function word_contains_vowels(word) {
+    for (const character of word) {
+        if (vowels.includes(character))
+            return true;
+    }
+    return false;
 }
 
 
-function word_with_accent(word, accent, classes_accent="accent-vowel"){
-    word = String(word ?? "");
-    if (accent !== undefined && accent !== null && accent >= 0 && accent < word.length)
-        return escape_html(word.slice(0, accent)) + `<span class="${classes_accent}">${escape_html(word[accent])}</span>` + escape_html(word.slice(accent + 1));
-    return escape_html(word);
+function word_with_accent(word, accent, accentClass = "accent-vowel") {
+    const normalizedWord = String(word ?? "");
+    if (Number.isInteger(accent) && accent >= 0 && accent < normalizedWord.length) {
+        return escape_html(normalizedWord.slice(0, accent)) +
+            `<span class="${accentClass}">${escape_html(normalizedWord[accent])}</span>` +
+            escape_html(normalizedWord.slice(accent + 1));
+    }
+    return escape_html(normalizedWord);
 }
 
 
-function word_data_to_html(word_data, classes_normal="info-text", classes_accent="accent-vowel"){
-    let word = word_data.word;
-    let accent = word_data.accent;
+function pronunciation_accessible_label(pronunciation) {
+    const stressedLetter = pronunciation.word[pronunciation.accent] ?? "";
+    let label = `${pronunciation.word}, націск на літару «${stressedLetter}»`;
+    const entry = pronunciation.dictionary_entry;
+    if (entry && !entry.is_initial && entry.initial_word) {
+        label += `, пачатковая форма ${entry.initial_word}`;
+    }
+    if (entry?.part_of_speech)
+        label += `, ${entry.part_of_speech}`;
+    if (!pronunciation.exact_match)
+        label += ", магчымае выпраўленне напісання";
+    return label;
+}
 
-    let text = word_with_accent(word, accent, classes_accent);
-    if (word_data.is_initial !== undefined){
-        if (!word_data.is_initial)
-            text += ` ${fa_long_arrow_left} ${word_with_accent(word_data.initial_word, word_data.initial_accent, classes_accent)}`;
-        text += ` (${escape_html(word_data.part_of_speech)})`;
+
+function normalize_pronunciation(pronunciation) {
+    if (!pronunciation || typeof pronunciation.word !== "string")
+        return null;
+
+    const accent = Number(pronunciation.accent);
+    if (!Number.isInteger(accent) || accent < 0 || accent >= pronunciation.word.length)
+        return null;
+
+    const dictionaryId = pronunciation.dictionary_id === undefined
+        ? null
+        : Number(pronunciation.dictionary_id);
+    if (dictionaryId !== null &&
+        (!Number.isInteger(dictionaryId) || dictionaryId <= 0)) {
+        return null;
     }
 
-    text = `<p class="${classes_normal}">${text}</p>`;
-    return text;
+    return {
+        dictionary_id: dictionaryId,
+        word: pronunciation.word,
+        accent: accent,
+        exact_match: pronunciation.exact_match === true,
+        dictionary_entry:
+            pronunciation.dictionary_entry &&
+            typeof pronunciation.dictionary_entry === "object"
+                ? pronunciation.dictionary_entry
+                : null,
+    };
 }
 
 
-function rhyme_word_length_class(word){
-    const word_length = String(word == null ? "" : word).length;
-    if (word_length > 17)
+function rhyme_word_length_class(word) {
+    const wordLength = String(word == null ? "" : word).length;
+    if (wordLength > 17)
         return "is-extra-long";
-    if (word_length > 12)
+    if (wordLength > 12)
         return "is-long";
     return "";
 }
 
 
-function rhyme_data_to_html(rhyme_data, word_variant_index, rhyme_index){
-    const word = rhyme_data.word;
-    const word_class = rhyme_word_length_class(word);
-    let meta = "";
+function rhyme_data_to_html(rhymeData, rhymeIndex) {
+    const word = rhymeData.word;
+    const wordClass = rhyme_word_length_class(word);
+    let metadata = "";
 
-    if (rhyme_data.is_initial !== undefined){
-        if (!rhyme_data.is_initial)
-            meta += `${fa_long_arrow_left} ${word_with_accent(rhyme_data.initial_word, rhyme_data.initial_accent)}`;
-        meta += ` (${escape_html(rhyme_data.part_of_speech)})`;
+    if (rhymeData.is_initial !== undefined) {
+        if (!rhymeData.is_initial) {
+            metadata += `${faLongArrowLeft} ${word_with_accent(
+                rhymeData.initial_word, rhymeData.initial_accent)}`;
+        }
+        metadata += ` (${escape_html(rhymeData.part_of_speech)})`;
     }
 
     return `
         <li class="rhyme-item">
-            <button class="rhyme-like" type="button" aria-label="Падабаецца" aria-pressed="false" data-word-variant-index="${word_variant_index}" data-rhyme-index="${rhyme_index}">
+            <button class="rhyme-like" type="button" aria-label="${escape_html(`Падабаецца: ${word}`)}" aria-pressed="false" data-rhyme-index="${rhymeIndex}">
                 <i class="fa fa-heart-o" aria-hidden="true"></i>
             </button>
             <div class="rhyme-text">
-                <p class="rhyme-main ${word_class}">${word_with_accent(word, rhyme_data.accent)}</p>
-                ${meta ? `<p class="rhyme-meta">${meta}</p>` : ""}
+                <p class="rhyme-main ${wordClass}">${word_with_accent(word, rhymeData.accent)}</p>
+                ${metadata ? `<p class="rhyme-meta">${metadata}</p>` : ""}
             </div>
         </li>`;
 }
 
 
-function get_like_payload(word_variant_index, rhyme_index){
-    if (!rhymes_response.rhymes_list)
+function get_like_payload(rhymeIndex) {
+    if (!rhymesResponse || !selectedPronunciation)
         return null;
 
-    const rhyme_group = rhymes_response.rhymes_list[word_variant_index];
-    if (!rhyme_group)
-        return null;
-
-    const request_word = rhyme_group.word_variant;
-    const rhyme_word = rhyme_group.rhymes_data[rhyme_index];
-
-    if (!request_word || !rhyme_word)
+    const rhymeWord = rhymesResponse.rhymes_data?.[rhymeIndex];
+    if (!rhymeWord)
         return null;
 
     return {
         request: {
-            word: request_word.word,
-            stress: request_word.accent,
+            word: selectedPronunciation.word,
+            stress: selectedPronunciation.accent,
         },
         rhyme: {
-            word: rhyme_word.word,
-            stress: rhyme_word.accent,
+            word: rhymeWord.word,
+            stress: rhymeWord.accent,
         },
     };
 }
 
 
-function set_rhyme_like_state(button, is_liked){
+function set_rhyme_like_state(button, isLiked) {
     const icon = button.querySelector("i");
-    button.classList.toggle("is-liked", is_liked);
-    button.setAttribute("aria-pressed", String(is_liked));
+    button.classList.toggle("is-liked", isLiked);
+    button.setAttribute("aria-pressed", String(isLiked));
 
-    if (icon){
-        icon.classList.toggle("fa-heart", is_liked);
-        icon.classList.toggle("fa-heart-o", !is_liked);
+    if (icon) {
+        icon.classList.toggle("fa-heart", isLiked);
+        icon.classList.toggle("fa-heart-o", !isLiked);
     }
 }
 
 
-function handle_rhyme_like_click(event){
+function handle_rhyme_like_click(event) {
     const button = event.target.closest(".rhyme-like");
-    if (!button || !rhymes_list.contains(button))
+    if (!button || !rhymesList.contains(button))
         return;
 
-    const word_variant_index = Number(button.dataset.wordVariantIndex);
-    const rhyme_index = Number(button.dataset.rhymeIndex);
-    const payload = get_like_payload(word_variant_index, rhyme_index);
-
+    const rhymeIndex = Number(button.dataset.rhymeIndex);
+    const payload = get_like_payload(rhymeIndex);
     if (!payload)
         return;
 
-    const is_liked = button.classList.contains("is-liked");
-    const endpoint = is_liked ? "/api/rhyme/dislike" : "/api/rhyme/like";
+    const isLiked = button.classList.contains("is-liked");
+    const endpoint = isLiked ? "/api/rhyme/dislike" : "/api/rhyme/like";
 
     button.disabled = true;
     $.ajax({
@@ -201,9 +284,9 @@ function handle_rhyme_like_click(event){
         dataType: "json",
         contentType: "application/json",
         data: JSON.stringify(payload),
-        success: () => set_rhyme_like_state(button, !is_liked),
+        success: () => set_rhyme_like_state(button, !isLiked),
         error: () => {
-            search_status_info.innerHTML = `<div class="alert alert-danger info-text" role="alert">Не атрымалася захаваць адзнаку рыфмы.</div>`;
+            render_status("Не атрымалася захаваць адзнаку рыфмы.", "danger");
         },
         complete: () => {
             button.disabled = false;
@@ -212,294 +295,519 @@ function handle_rhyme_like_click(event){
 }
 
 
-function update_rhymes(word_variant_index){
-    dropdown_choose_word.innerHTML = "";
-    if (precalc_rhymes_html.length > 1)
-        dropdown_choose_word.innerHTML = `${word_variant_index + 1}/${precalc_rhymes_html.length} `;
-    dropdown_choose_word.innerHTML +=
-        word_data_to_html(rhymes_response.rhymes_list[word_variant_index].word_variant);
-    
-    rhymes_list.innerHTML = precalc_rhymes_html[word_variant_index];
-    rhymes_count_text.innerHTML = precalc_rhymes_count[word_variant_index];
+function read_filters() {
+    const partOfSpeech = [];
+    for (let index = 1; index <= 7; ++index) {
+        partOfSpeech.push(document.getElementById(`check-posp-${index}`).checked);
+    }
+
+    const selectedMistake = document.querySelector(
+        "#search-mistake-radio input[type='radio']:checked");
+    return {
+        filtered_posp: partOfSpeech,
+        only_initial: document.getElementById("check-only-initial").checked,
+        search_mistake: Number(selectedMistake?.value ?? -1),
+    };
 }
 
 
-function process_rhymes_response(data){
-    rhymes_list.innerHTML = "";
-
-    rhymes_response = data;
-    
-    set_loading(false);
-
-    word_variants_block.style.visibility="visible";
-    dropdown_choose_word.innerHTML="-";
-    dropdown_choose_word_menu.innerHTML = "";
-    search_status_text.innerHTML = `Варыянты: ${Object.keys(data.rhymes_list).length}`;
-    search_status_info.innerHTML = "";
-
-    if (Object.keys(data.rhymes_list).length == 0){
-        generate_letter_buttons();
-        return;
-    }
-    
-    rhymes_block.style.display = "block";
-
-    precalc_rhymes_html = precalc_rhymes_html.slice(0, data.rhymes_list.length)
-    precalc_rhymes_count = precalc_rhymes_count.slice(0, data.rhymes_list.length)
-    for (let i in data.rhymes_list){
-        let word_data = data.rhymes_list[i].word_variant;
-        dropdown_choose_word_menu.innerHTML += `<li><button class="dropdown-item" data-rhyme-index="${i}">${word_data_to_html(word_data)}</button></li>`;
-
-        precalc_rhymes_html[i] = "";
-        const rhymes_data = data.rhymes_list[i].rhymes_data;
-
-        if (rhymes_data.length == 0){
-            precalc_rhymes_html[i] += `<div class="alert alert-info info-text" role="alert">Пу-пу-пу! Рыфмаў абранай трапнасці не знайшлося. Змяніце фільтры (<i class="fa fa-cog"></i>) або паспрабуйце іншае слова.</div>`;
-            precalc_rhymes_count[i] = ` - `;
-        }
-        else{
-            rhymes_count_text.innerHTML = `Рыфмы: ${rhymes_data.length}`;
-            if (rhymes_data.length == 1000)
-                rhymes_count_text.innerHTML += `<span class="count-warning">(!)</span>`
-            precalc_rhymes_count[i] = rhymes_count_text.innerHTML;
-        }
-
-        for (let j in rhymes_data)
-            precalc_rhymes_html[i] += rhyme_data_to_html(rhymes_data[j], i, j);
-    }
-
-    dropdown_choose_word_menu.querySelectorAll("[data-rhyme-index]").forEach((button) => {
-        button.addEventListener("click", () => update_rhymes(Number(button.dataset.rhymeIndex)));
-    });
-    update_rhymes(0);
+function clean_input_word(word) {
+    return word
+        .toLowerCase()
+        .trim()
+        .replaceAll(" ", "-")
+        .replaceAll("и", "і")
+        .replaceAll("i", "і")
+        .replaceAll("щ", "ў")
+        .replaceAll("ъ", "'");
 }
 
 
-function generate_letter_buttons(){
-    accent_index = -1;
-    search_status_info.innerHTML = `<div class="alert alert-warning info-text" role="alert">Невядомае слова</div>`
-
-    let word = w;
-
-    if (!word_contains_vowels(word)){
-        search_status_info.innerHTML = `<div class="alert alert-danger info-text" role="alert">У гэтым слове няма галосных</div>`;
-        return;
+function validate_search_word(word) {
+    if (word === "")
+        return {valid: false, message: ""};
+    if (!is_belarusian(word)) {
+        return {
+            valid: false,
+            message: "Слова павінна складацца толькі з беларускіх літар!",
+        };
     }
-    
-    letter_buttons_block.innerHTML = "";
-    manual_accent_modal.show();
-    
-    const letters_div = letter_buttons_block;
-
-    for (let char in word){
-        if (vowels.includes(word[char])){
-            letters_div.innerHTML += `\n<button type="button" class="square-letter-button-outline" data-accent-index="${char}" id="letter_btn${char}">${escape_html(word[char])}</button>`;
-            accent_index = parseInt(char);
-        }
-        else{
-            letters_div.innerHTML += `\n<div class="square-letter-label"><label>${escape_html(word[char])}</label></div>`;
-        }
+    if (Array.from(word).length > 40) {
+        return {
+            valid: false,
+            message: "Нельга ўводзіць словы даўжэй за 40 літар!",
+        };
     }
-
-    letters_div.querySelectorAll("[data-accent-index]").forEach((button) => {
-        button.addEventListener("click", () => letter_button_onclick(Number(button.dataset.accentIndex)));
-    });
-    letter_button_onclick(accent_index);
+    return {valid: true, message: ""};
 }
 
 
-function letter_button_onclick(index){
-    const btn = document.getElementById(`letter_btn${index}`);
-    if (accent_index != -1){
-        const prev_btn = document.getElementById(`letter_btn${accent_index}`);
-        prev_btn.classList.remove("square-letter-button-chosen");
-        prev_btn.classList.add("square-letter-button-outline");
-    }
-
-    accent_index = index;
-    btn.classList.remove("square-letter-button-outline");
-    btn.classList.add("square-letter-button-chosen");
+function cancel_active_rhyme_request() {
+    ++requestVersion;
+    const request = activeRhymeRequest;
+    activeRhymeRequest = null;
+    if (request)
+        request.abort();
 }
 
 
-function clean_input_word(w) {
-    w = w.toLowerCase();
-    let pref = 0;
-    while (pref < w.length && w[pref] == ' ') {
-        ++pref;
-    }
-    let suf = w.length - 1;
-    while (suf >= 0 && w[suf] == ' ') {
-        --suf;
-    }
-    w = w.slice(pref, suf + 1);
-    w = w.replaceAll(" ", "-");
-    w = w.replaceAll("и", "і");
-    w = w.replaceAll("i", "і"); // english i
-    w = w.replaceAll("щ", "ў");
-    w = w.replaceAll("ъ", "'");
-    return w;
-}
-
-
-function post_rhymes_request(){
-    for (let i = 1; i <= 7; ++i){
-        filtered_parts_of_speech[i - 1] = document.getElementById(`check-posp-${i}`).checked;
-    }
-    filtered_only_initial = document.getElementById(`check-only-initial`).checked;
-    search_mistake = parseInt($("#search-mistake-radio :input:radio:checked").val());
-
-    w = clean_input_word(search_input_rhyme.value);
-
-    accent_index = -1;
-
-    if (w == ""){
-        word_variants_block.style.visibility = "visible";
-        return;
-    }
-
-    if (!is_belarusian(w)){        
-        search_status_info.innerHTML = `<div class="alert alert-danger info-text" role="alert">Слова павінна складацца толькі з беларускіх літар!</div>`;
-        return;
-    }
-
-    if (w.length > 40){        
-        search_status_info.innerHTML = `<div class="alert alert-danger info-text" role="alert">Нельга ўводзіць словы даўжэй за 40 літар! </div>`;
-        return;
-    }
-
-    set_loading(true);
-    rhymes_block.style.display = "none";
-
-    $.ajax({
+function send_rhyme_request(payload, onSuccess, errorMessage) {
+    cancel_active_rhyme_request();
+    const version = requestVersion;
+    const request = $.ajax({
         url: "/api/rhymes",
         method: "post",
         dataType: "json",
         contentType: "application/json",
-        data: JSON.stringify({
-            "word": w,
-            "filtered_posp": filtered_parts_of_speech,
-            "only_initial": filtered_only_initial,
-            "search_mistake": search_mistake
-        }),
-        success: process_rhymes_response,
-        error: () => {
-            search_status_info.innerHTML = `<div class="alert alert-danger info-text" role="alert">Не атрымалася выканаць пошук. Паспрабуйце яшчэ раз.</div>`;
-        },
-        complete: () => set_loading(false),
+        data: JSON.stringify(payload),
+    });
+    activeRhymeRequest = request;
+
+    request.done((data) => {
+        if (version === requestVersion)
+            onSuccess(data);
+    });
+    request.fail((_response, status) => {
+        if (version !== requestVersion || status === "abort")
+            return;
+        set_search_state(RhymeSearchState.error);
+        render_status(errorMessage, "danger");
+    });
+    request.always(() => {
+        if (version !== requestVersion)
+            return;
+        activeRhymeRequest = null;
+        set_loading(false);
     });
 }
 
 
-function post_rhymes_with_manual_accent(){
-    if (w == ""){
-        word_variants_block.style.visibility = "visible";
+function hide_rhyme_results() {
+    rhymesBlock.classList.add("is-hidden");
+    rhymesCountText.textContent = "";
+    rhymesList.replaceChildren();
+}
+
+
+function reset_search_state() {
+    cancel_active_rhyme_request();
+    set_search_state(RhymeSearchState.idle);
+    currentWord = "";
+    accentIndex = -1;
+    selectedPronunciation = null;
+    pronunciationVariants = [];
+    rhymesResponse = null;
+    openManualAccentAfterVariantModal = false;
+    pronunciationModal.hide();
+    selectedPronunciationControl.hidden = true;
+    pronunciationOptions.replaceChildren();
+    hide_rhyme_results();
+    render_status("");
+    manualAccentModal.hide();
+}
+
+
+function request_payload(word, accent = null, dictionaryId = null) {
+    const payload = {
+        word: word,
+        ...read_filters(),
+    };
+    if (accent !== null)
+        payload.accent = accent;
+    if (dictionaryId !== null)
+        payload.dictionary_id = dictionaryId;
+    return payload;
+}
+
+
+function start_new_search() {
+    const word = clean_input_word(searchInputRhyme.value);
+    reset_search_state();
+
+    const validation = validate_search_word(word);
+    if (!validation.valid) {
+        if (validation.message) {
+            set_search_state(RhymeSearchState.error);
+            render_status(validation.message, "danger");
+        }
         return;
     }
 
-    if (!is_belarusian(w)){        
-        search_status_info.innerHTML = `<div class="alert alert-danger info-text" role="alert">Слова павінна складацца толькі з беларускіх літар!</div>`;
+    currentWord = word;
+    request_rhyme_resolution();
+}
+
+
+function request_rhyme_resolution() {
+    set_search_state(RhymeSearchState.lookingUp);
+    pronunciationModal.hide();
+    selectedPronunciationControl.hidden = true;
+    hide_rhyme_results();
+    render_status("");
+
+    send_rhyme_request(
+        request_payload(currentWord),
+        process_resolution_response,
+        "Не атрымалася выканаць пошук. Паспрабуйце яшчэ раз."
+    );
+}
+
+
+function response_error() {
+    set_search_state(RhymeSearchState.error);
+    pronunciationModal.hide();
+    selectedPronunciationControl.hidden = true;
+    hide_rhyme_results();
+    render_status("Сервер вярнуў некарэктны вынік пошуку.", "danger");
+}
+
+
+function process_resolution_response(data) {
+    if (!data || typeof data.status !== "string") {
+        response_error();
         return;
     }
 
-    if (w.length > 40){        
-        search_status_info.innerHTML = `<div class="alert alert-danger info-text" role="alert">Нельга ўводзіць словы даўжэй за 40 літар! </div>`;
+    if (data.status === "not_found") {
+        selectedPronunciation = null;
+        pronunciationVariants = [];
+        rhymesResponse = null;
+        set_search_state(RhymeSearchState.needsChoice);
+        render_status("Невядомае слова", "warning");
+        open_manual_accent_picker(true);
         return;
     }
 
-    if (accent_index == -1){        
-        search_status_info.innerHTML = `<div class="alert alert-danger info-text" role="alert">Укажыце націскную галосную</div>`
+    if (data.status === "needs_choice") {
+        if (!Array.isArray(data.variants) || data.variants.length === 0) {
+            response_error();
+            return;
+        }
+        render_variant_picker(data.variants);
         return;
     }
 
-    manual_accent_modal.hide();
-    
-    search_status_info.innerHTML = "";
-    set_loading(true);
+    if (data.status === "resolved") {
+        process_resolved_response(data);
+        return;
+    }
 
-    $.ajax({
-        url: "/api/rhymes",
-        method: "post",
-        dataType: "json",
-        contentType: "application/json",
-        data: JSON.stringify({
-            "word": w,
-            "accent": accent_index,
-            "filtered_posp": filtered_parts_of_speech,
-            "only_initial": filtered_only_initial,
-            "search_mistake": search_mistake
-        }),
-        success: process_rhymes_response,
-        error: () => {
-            search_status_info.innerHTML = `<div class="alert alert-danger info-text" role="alert">Не атрымалася выканаць пошук. Паспрабуйце яшчэ раз.</div>`;
-        },
-        complete: () => set_loading(false),
+    response_error();
+}
+
+
+function render_variant_picker(variants) {
+    const normalizedVariants = variants
+        .map(normalize_pronunciation)
+        .filter((variant) => variant !== null && variant.dictionary_id !== null);
+    if (normalizedVariants.length === 0) {
+        response_error();
+        return;
+    }
+
+    pronunciationVariants = normalizedVariants;
+    selectedPronunciation = null;
+    rhymesResponse = null;
+    set_search_state(RhymeSearchState.needsChoice);
+    hide_rhyme_results();
+    selectedPronunciationControl.hidden = true;
+    render_pronunciation_options();
+    pronunciationModal.show();
+    render_status("");
+}
+
+
+function render_pronunciation_options() {
+    pronunciationOptions.replaceChildren();
+
+    pronunciationVariants.forEach((pronunciation, index) => {
+        const option = document.createElement("li");
+        option.className = "rhyme-pronunciation-option";
+
+        const button = document.createElement("button");
+        button.className = "rhyme-pronunciation-option-button";
+        button.type = "button";
+        button.dataset.pronunciationIndex = String(index);
+        button.setAttribute(
+            "aria-label", pronunciation_accessible_label(pronunciation));
+
+        const bullet = document.createElement("span");
+        bullet.className = "rhyme-pronunciation-bullet";
+        bullet.setAttribute("aria-hidden", "true");
+        bullet.textContent = "•";
+
+        const text = document.createElement("span");
+        text.className = "rhyme-pronunciation-option-text";
+
+        const word = document.createElement("span");
+        word.innerHTML = word_with_accent(pronunciation.word, pronunciation.accent);
+        text.appendChild(word);
+
+        const entry = pronunciation.dictionary_entry;
+        if (entry && !entry.is_initial && entry.initial_word) {
+            text.appendChild(document.createTextNode(" ← "));
+            const initialWord = document.createElement("span");
+            initialWord.innerHTML = word_with_accent(
+                entry.initial_word, Number(entry.initial_accent));
+            text.appendChild(initialWord);
+        }
+        if (entry?.part_of_speech) {
+            text.appendChild(document.createTextNode(
+                ` (${entry.part_of_speech})`));
+        }
+
+        if (!pronunciation.exact_match) {
+            const correction = document.createElement("span");
+            correction.className = "rhyme-pronunciation-correction";
+            correction.textContent = "Магчымае выпраўленне напісання";
+            text.appendChild(correction);
+        }
+
+        button.appendChild(bullet);
+        button.appendChild(text);
+        option.appendChild(button);
+        pronunciationOptions.appendChild(option);
     });
 }
 
 
-function update_filters(){
-    for (let i = 1; i <= 7; ++i){
-        filtered_parts_of_speech[i - 1] = document.getElementById(`check-posp-${i}`).checked;
-    }
-    filtered_only_initial = document.getElementById(`check-only-initial`).checked;
-    search_mistake = parseInt($("#search-mistake-radio :input:radio:checked").val());
-
-    let new_input = clean_input_word(search_input_rhyme.value);
-    if (new_input != w){
-        w = new_input;
-        accent_index = -1;
-    }
-
-    if (w == "" || !is_belarusian(w) || w.length > 40)
+function select_variant(index) {
+    const pronunciation = pronunciationVariants[index];
+    if (!pronunciation)
         return;
 
-    search_status_info.innerHTML = "";
-    set_loading(true);
+    openManualAccentAfterVariantModal = false;
+    selectedPronunciation = pronunciation;
+    pronunciationModal.hide();
+    render_selected_pronunciation();
+    request_selected_rhymes();
+}
 
-    if (accent_index == -1){
-        $.ajax({
-            url: "/api/rhymes",
-            method: "post",
-            dataType: "json",
-            contentType: "application/json",
-            data: JSON.stringify({
-                "word": w,
-                "filtered_posp": filtered_parts_of_speech,
-                "only_initial": filtered_only_initial,
-                "search_mistake": search_mistake,
-            }),
-                success: process_rhymes_response,
-                error: () => {
-                    search_status_info.innerHTML = `<div class="alert alert-danger info-text" role="alert">Не атрымалася абнавіць фільтры. Паспрабуйце яшчэ раз.</div>`;
-                },
-                complete: () => set_loading(false),
-            });
+
+function render_selected_pronunciation() {
+    if (!selectedPronunciation) {
+        selectedPronunciationControl.hidden = true;
+        return;
     }
-    else{
-        $.ajax({
-            url: "/api/rhymes",
-            method: "post",
-            dataType: "json",
-            contentType: "application/json",
-            data: JSON.stringify({
-                "word": w,
-                "accent": accent_index,
-                "filtered_posp": filtered_parts_of_speech,
-                "only_initial": filtered_only_initial,
-                "search_mistake": search_mistake,
-            }),
-            success: process_rhymes_response,
-            error: () => {
-                search_status_info.innerHTML = `<div class="alert alert-danger info-text" role="alert">Не атрымалася абнавіць фільтры. Паспрабуйце яшчэ раз.</div>`;
-            },
-            complete: () => set_loading(false),
-        });
+
+    selectedPronunciationText.innerHTML = word_with_accent(
+        selectedPronunciation.word, selectedPronunciation.accent);
+    const entry = selectedPronunciation.dictionary_entry;
+    if (entry && !entry.is_initial && entry.initial_word) {
+        selectedPronunciationText.appendChild(document.createTextNode(" ← "));
+        const initialWord = document.createElement("span");
+        initialWord.innerHTML = word_with_accent(
+            entry.initial_word, Number(entry.initial_accent));
+        selectedPronunciationText.appendChild(initialWord);
+    }
+    if (entry?.part_of_speech) {
+        selectedPronunciationText.appendChild(document.createTextNode(
+            ` (${entry.part_of_speech})`));
+    }
+    if (!selectedPronunciation.exact_match) {
+        const correction = document.createElement("span");
+        correction.className = "small-info-text";
+        correction.textContent = " (выпраўленае напісанне)";
+        selectedPronunciationText.appendChild(correction);
+    }
+    selectedPronunciationControl.setAttribute(
+        "aria-label", pronunciation_accessible_label(selectedPronunciation));
+    selectedPronunciationControl.hidden = false;
+}
+
+
+function request_selected_rhymes(errorMessage = "Не атрымалася знайсці рыфмы. Паспрабуйце яшчэ раз.") {
+    if (!selectedPronunciation)
+        return;
+
+    set_search_state(RhymeSearchState.loadingRhymes);
+    pronunciationModal.hide();
+    hide_rhyme_results();
+    render_selected_pronunciation();
+    render_status("");
+
+    send_rhyme_request(
+        request_payload(
+            selectedPronunciation.word,
+            selectedPronunciation.accent,
+            selectedPronunciation.dictionary_id),
+        (data) => process_resolved_response(data, selectedPronunciation),
+        errorMessage
+    );
+}
+
+
+function process_resolved_response(data, preferredPronunciation = null) {
+    if (!data || data.status !== "resolved" || !Array.isArray(data.rhymes_data)) {
+        response_error();
+        return;
+    }
+
+    const responsePronunciation = normalize_pronunciation(data.selected_variant);
+    if (!responsePronunciation) {
+        response_error();
+        return;
+    }
+
+    if (
+        preferredPronunciation &&
+        preferredPronunciation.word === responsePronunciation.word &&
+        preferredPronunciation.accent === responsePronunciation.accent &&
+        preferredPronunciation.dictionary_id === responsePronunciation.dictionary_id
+    ) {
+        selectedPronunciation = preferredPronunciation;
+    } else {
+        selectedPronunciation = responsePronunciation;
+    }
+
+    if (pronunciationVariants.length === 0 &&
+        selectedPronunciation.dictionary_id !== null) {
+        pronunciationVariants = [selectedPronunciation];
+    }
+
+    rhymesResponse = {
+        status: "resolved",
+        selected_variant: selectedPronunciation,
+        rhymes_data: data.rhymes_data,
+    };
+    render_selected_pronunciation();
+    render_rhymes(data.rhymes_data);
+}
+
+
+function render_rhymes(rhymes) {
+    pronunciationModal.hide();
+    rhymesList.replaceChildren();
+    rhymesBlock.classList.remove("is-hidden");
+    rhymesCountText.textContent = `Рыфмы: ${rhymes.length}`;
+
+    if (rhymes.length === 0) {
+        rhymesList.innerHTML = `<li class="alert alert-info info-text" role="alert">Пу-пу-пу! Рыфмаў абранай трапнасці не знайшлося. Змяніце фільтры (<i class="fa fa-cog" aria-hidden="true"></i>) або паспрабуйце іншае слова.</li>`;
+    } else {
+        rhymesList.innerHTML = rhymes
+            .map((rhyme, index) => rhyme_data_to_html(rhyme, index))
+            .join("");
+    }
+
+    set_search_state(RhymeSearchState.showingResults);
+    render_status("");
+}
+
+
+function open_manual_accent_picker(isUnknownWord) {
+    accentIndex = -1;
+    if (!word_contains_vowels(currentWord)) {
+        set_search_state(RhymeSearchState.error);
+        render_status("У гэтым слове няма галосных", "danger");
+        return;
+    }
+
+    set_search_state(RhymeSearchState.needsChoice);
+    letterButtonsBlock.replaceChildren();
+    const letters = Array.from(currentWord);
+
+    letters.forEach((letter, index) => {
+        if (vowels.includes(letter)) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "square-letter-button-outline";
+            button.dataset.accentIndex = String(index);
+            button.id = `letter_btn${index}`;
+            button.textContent = letter;
+            button.setAttribute("aria-pressed", "false");
+            button.setAttribute(
+                "aria-label", `Націск на літару «${letter}», пазіцыя ${index + 1}`);
+            button.addEventListener("click", () => letter_button_onclick(index));
+            letterButtonsBlock.appendChild(button);
+            accentIndex = index;
+        } else {
+            const label = document.createElement("div");
+            label.className = "square-letter-label";
+            label.textContent = letter;
+            letterButtonsBlock.appendChild(label);
+        }
+    });
+
+    letter_button_onclick(accentIndex);
+    manualAccentModal.show();
+}
+
+
+function letter_button_onclick(index) {
+    const button = document.getElementById(`letter_btn${index}`);
+    if (!button)
+        return;
+
+    if (accentIndex !== -1) {
+        const previousButton = document.getElementById(`letter_btn${accentIndex}`);
+        if (previousButton) {
+            previousButton.classList.remove("square-letter-button-chosen");
+            previousButton.classList.add("square-letter-button-outline");
+            previousButton.setAttribute("aria-pressed", "false");
+        }
+    }
+
+    accentIndex = index;
+    button.classList.remove("square-letter-button-outline");
+    button.classList.add("square-letter-button-chosen");
+    button.setAttribute("aria-pressed", "true");
+}
+
+
+function post_rhymes_with_manual_accent() {
+    const validation = validate_search_word(currentWord);
+    if (!validation.valid) {
+        set_search_state(RhymeSearchState.error);
+        render_status(validation.message, "danger");
+        return;
+    }
+    if (accentIndex === -1) {
+        render_status("Укажыце націскную галосную", "danger");
+        return;
+    }
+
+    manualAccentModal.hide();
+    selectedPronunciation = {
+        dictionary_id: null,
+        word: currentWord,
+        accent: accentIndex,
+        exact_match: true,
+        dictionary_entry: null,
+    };
+    render_selected_pronunciation();
+    request_selected_rhymes();
+}
+
+
+function change_pronunciation() {
+    if (!currentWord)
+        return;
+
+    if (pronunciationVariants.length > 0) {
+        render_pronunciation_options();
+        pronunciationModal.show();
+    } else {
+        open_manual_accent_picker(false);
     }
 }
 
 
-function scroll_up(){
+function update_filters() {
+    const editedWord = clean_input_word(searchInputRhyme.value);
+    if (editedWord !== currentWord) {
+        start_new_search();
+        return;
+    }
+
+    if (!selectedPronunciation)
+        return;
+
+    request_selected_rhymes(
+        "Не атрымалася абнавіць фільтры. Паспрабуйце яшчэ раз.");
+}
+
+
+function scroll_up() {
     window.scrollTo({top: 0, behavior: "smooth"});
 }
 
