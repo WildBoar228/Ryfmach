@@ -1,4 +1,5 @@
 #include "bel_lang_engine.hpp"
+#include "log.hpp"
 #include "ryfmach_service.hpp"
 #include "server.hpp"
 
@@ -37,8 +38,8 @@ int main() {
     try {
         (void)ryfmach::bel::DefaultSoundCompatibilityTable();
     } catch (const std::exception& exception) {
-        std::cerr << "failed to load sound compatibility data: "
-                  << exception.what() << "\n";
+        ryfmach::app::common_log.error(
+            "failed to load sound compatibility data: {}", exception.what());
         return 1;
     }
 
@@ -50,9 +51,9 @@ int main() {
     std::string host = GetHostName();
     int port = GetPort();
 
-    std::cout << "Ryfmach is listening on " << host << ":" << port << "\n";
+    ryfmach::app::common_log.info("Ryfmach is listening on {}:{}", host, port);
     if (!server.Listen(host, port)) {
-        std::cerr << "failed to bind " << host << ":" << port << "\n";
+        ryfmach::app::common_log.error("failed to bind {}:{}", host, port);
         return 1;
     }
 

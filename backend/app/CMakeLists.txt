@@ -10,11 +10,13 @@ add_executable(
     ryfmach
     app.cpp
     server.cpp
+    log.cpp
 )
 
 target_link_libraries(ryfmach PUBLIC
     ryfmach_service
     httplib::httplib
-    nlohmann_json::nlohmann_json)
+    nlohmann_json::nlohmann_json
+    spdlog::spdlog)
 
 target_include_directories(ryfmach PUBLIC ${BEL_LANG_ENGINE_PATH}/include)

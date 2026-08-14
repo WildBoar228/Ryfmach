@@ -1,9 +1,15 @@
+#include "log.hpp"
 #include "server.hpp"
 
 #include <httplib.h>
 #include <nlohmann/json.hpp>
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/sinks/rotating_file_sink.h"
 
+#include <cstdlib>
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <span>
 #include <string>
@@ -13,6 +19,12 @@ namespace ryfmach::app {
 namespace {
 
 using json = nlohmann::json;
+
+std::string GetApiLogPath() {
+    const char kDefaultLogPath[] = "";
+    const char* path = std::getenv("RYFMACH_API_LOG_DIR");
+    return (path ? path : kDefaultLogPath);
+}
 
 ryfmach::bel::RhymeSearchFilters FiltersFromJson(const json& j) {
     using namespace ryfmach::bel;
@@ -168,6 +180,22 @@ void WriteJson(httplib::Response& res, int status, const json& body) {
     res.set_content(body.dump(), "application/json");
 }
 
+void LogTopRhymes(const RhymesResult& result, size_t top_k) {
+    for (const auto& word : result.rhymes_list) {
+        std::string top_rhymes;
+        for (int i = 0; i < top_k && i < (int)word.rhymes.size(); ++i) {
+            top_rhymes += word.rhymes[i].word + "  ";
+        }
+        rhymes_log.debug("Rhymes to word \"{}\" ({}, {}):  {} rhymes:  {}",
+            word.word_variant.word,
+            word.word_variant.accent,
+            word.word_variant.part_of_speech,
+            word.rhymes.size(),
+            top_rhymes
+        );
+    }
+}
+
 void HandleRhymesRequest(
     const httplib::Request& req,
     httplib::Response& res,
@@ -184,22 +212,52 @@ void HandleRhymesRequest(
         }
         ryfmach::bel::RhymeSearchFilters filters = FiltersFromJson(request);
 
+        RhymesResult result;
+
         if (request.contains("accent")) {
             const std::size_t accent = request.at("accent").get<std::size_t>();
-            WriteJson(res, 200,
-                RhymesResultToJson(service.FindRhymes(word, accent, filters)));
+            common_log.info("Rhymes to \"{}\", {} ", word, accent);
+            result = service.FindRhymes(word, accent, filters);
         } else {
-            WriteJson(res, 200,
-                RhymesResultToJson(service.FindRhymes(word, filters)));
+            common_log.info("Rhymes to \"{}\"", word);
+            result = service.FindRhymes(word, filters);
         }
+
+        LogTopRhymes(result, 5);
+        WriteJson(res, 200, RhymesResultToJson(result));
     } catch (const json::exception&) {
+        common_log.error("Failed to find rhymes: wrong format");
         WriteJson(
             res,
             400,
             {{"error", "Request body must be JSON with a word string."}});
     } catch (const std::exception& exception) {
-        std::cerr << "failed to find rhymes: " << exception.what() << '\n';
+        common_log.error("Failed to find rhymes: {}", exception.what());
         WriteJson(res, 500, {{"error", "Unable to find rhymes."}});
+    }
+}
+
+std::string JoinTranscription(
+    std::span<const ryfmach::bel::Sound> transcription) {
+    std::string result;
+    for (std::size_t index = 0; index < transcription.size(); ++index) {
+        if (index != 0) {
+            result += ' ';
+        }
+        result += ryfmach::bel::SoundSpelling(transcription[index]);
+    }
+    return result;
+}
+
+void LogTranscription(const PhoneticsResult& result) {
+    for (const auto& word : result.word_variants) {
+        std::string transcr = JoinTranscription(word.transcription);
+        phonetics_log.debug("Transcription of \"{}\" ({}, {}): {}",
+            word.word_variant.word,
+            word.word_variant.accent,
+            word.word_variant.part_of_speech,
+            transcr
+        );
     }
 }
 
@@ -217,24 +275,40 @@ void HandlePhoneticsRequest(
             return;
         }
 
+        PhoneticsResult result;
+
         const std::string word = request.at("word").get<std::string>();
         if (request.contains("accent") && !request.at("accent").is_null()) {
             const std::size_t accent = request.at("accent").get<std::size_t>();
-            WriteJson(
-                res,
-                200,
-                PhoneticsResultToJson(service.AnalyzePhonetics(word, accent)));
+            common_log.info("Phonetics \"{}\", {} ", word, accent);
+            result = service.AnalyzePhonetics(word, accent);
         } else {
-            WriteJson(res, 200, PhoneticsResultToJson(service.AnalyzePhonetics(word)));
+            common_log.info("Phonetics \"{}\"", word);
+            result = service.AnalyzePhonetics(word);
         }
+
+        LogTranscription(result);
+        WriteJson(res, 200, PhoneticsResultToJson(service.AnalyzePhonetics(word)));
+
     } catch (const json::exception&) {
+        common_log.error("Failed to analyze phonetics: wrong format");
         WriteJson(
             res,
             400,
             {{"error", "Request body must be JSON with a word string."}});
     } catch (const std::exception& exception) {
-        std::cerr << "failed to analyze phonetics: " << exception.what() << '\n';
+        common_log.error("Failed to analyze phonetics: {}", exception.what());
         WriteJson(res, 500, {{"error", "Unable to analyze phonetics."}});
+    }
+}
+
+void LogMorphems(const MorphemicsResult& result) {
+    for (const auto& word : result.variants) {
+        std::string morphems = EncodeMorphemicAnalysis(word.analysis);
+        if (!word.sure) {
+            morphems += " (NOT SURE)";
+        }
+        morphemics_log.debug("Morphems: {}", morphems);
     }
 }
 
@@ -251,16 +325,20 @@ void HandleMorphemicsRequest(
                 {{"variants", json::array()}, {"word_found", false}});
             return;
         }
-
+        
         const std::string word = request.at("word").get<std::string>();
-        WriteJson(res, 200, MorphemicsResultToJson(service.AnalyzeMorphemics(word)));
+        common_log.info("Morphemics for \"{}\"", word);
+        MorphemicsResult result = service.AnalyzeMorphemics(word);
+        LogMorphems(result);
+        WriteJson(res, 200, MorphemicsResultToJson(result));
     } catch (const json::exception&) {
+        common_log.error("Failed to analyze morphemics: wrong format");
         WriteJson(
             res,
             400,
             {{"error", "Request body must be JSON with a word string."}});
     } catch (const std::exception& exception) {
-        std::cerr << "failed to analyze morphemics: " << exception.what() << '\n';
+        common_log.error("Failed to analyze morphemics: {}", exception.what());
         WriteJson(res, 500, {{"error", "Unable to analyze morphemics."}});
     }
 }
@@ -305,18 +383,29 @@ void HandleRhymeLikeRequest(
             parsed.rhyme.word, parsed.rhyme.stress,
             delta)}});
     } catch (const json::exception& exception) {
-        std::cerr << "Invalid like payload: " << exception.what() << '\n';
+        common_log.error("Invalid like payload");
         WriteJson(res, 400, {{"error", "Invalid like payload"}});
     } catch (const std::exception& exception) {
-        std::cerr << "failed to update rhyme score: " << exception.what() << '\n';
+        common_log.error("Failed to update rhyme score: {}", exception.what());
         WriteJson(res, 500, {{"error", "Unable to update rhyme score."}});
     }
+}
+
+std::string GetRemoteAddr(const httplib::Request& req) {
+    auto remote_addr_it = req.headers.find("REMOTE_ADDR");
+    std::string remote_addr = (remote_addr_it == req.headers.end()
+        ? "0.0.0.0"
+        : remote_addr_it->second);
+    
+    return remote_addr;
 }
 
 } // namespace
 
 RyfmachServer::RyfmachServer(RyfmachService& service)
-    : service_(service) {}
+    : service_(service) {
+    InitializeLoggers(GetApiLogPath(), max_log_size_, max_log_files_);
+}
 
 bool RyfmachServer::Listen(std::string_view host, int port) const {
     httplib::Server server;
@@ -330,39 +419,78 @@ bool RyfmachServer::Listen(std::string_view host, int port) const {
     server.Post(
         "/api/rhymes",
         [this](const httplib::Request& req, httplib::Response& res) {
-            std::cout << "/api/rhymes\n";
+            std::string remote_addr = GetRemoteAddr(req);
+            common_log.info("[{}] POST /api/rhymes", remote_addr);
+            auto start_time = bench_clock_.now();
+
             HandleRhymesRequest(req, res, service_);
+
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(
+                bench_clock_.now() - start_time);
+            common_log.info("[{}] /api/rhymes: responded in {}ms", remote_addr, diff.count());
         });
 
     server.Post(
         "/api/phonetics",
         [this](const httplib::Request& req, httplib::Response& res) {
-            std::cout << "/api/phonetics\n";
+            std::string remote_addr = GetRemoteAddr(req);
+            common_log.info("[{}] POST /api/phonetics", remote_addr);
+            auto start_time = bench_clock_.now();
+
             HandlePhoneticsRequest(req, res, service_);
+
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(
+                bench_clock_.now() - start_time);
+            common_log.info("[{}] /api/phonetics: responded in {}ms", remote_addr, diff.count());
         });
 
     server.Post(
         "/api/morphemics",
         [this](const httplib::Request& req, httplib::Response& res) {
-            std::cout << "/api/morphemics\n";
+            std::string remote_addr = GetRemoteAddr(req);
+            common_log.info("[{}] POST /api/morphemics", remote_addr);
+            auto start_time = bench_clock_.now();
+
             HandleMorphemicsRequest(req, res, service_);
+
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(
+                bench_clock_.now() - start_time);
+            common_log.info("[{}] /api/morphemics: responded in {}ms", remote_addr, diff.count());
         });
 
     server.Post(
         "/api/rhyme/like",
         [this](const httplib::Request& req, httplib::Response& res) {
-            std::cout << "/api/rhyme/like" << std::endl;
+            std::string remote_addr = GetRemoteAddr(req);
+            common_log.info("[{}] POST /api/rhyme/like", remote_addr);
+            auto start_time = bench_clock_.now();
+
             HandleRhymeLikeRequest(req, res, service_, 1);
+
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(
+                bench_clock_.now() - start_time);
+            common_log.info("[{}] /api/rhyme/like: responded in {}ms", remote_addr, diff.count());
         });
 
     server.Post(
         "/api/rhyme/dislike",
         [this](const httplib::Request& req, httplib::Response& res) {
-            std::cout << "/api/rhyme/dislike" << std::endl;
+            std::string remote_addr = GetRemoteAddr(req);
+            common_log.info("[{}] POST /api/rhyme/dislike", remote_addr);
+            auto start_time = bench_clock_.now();
+            
             HandleRhymeLikeRequest(req, res, service_, -1);
+
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(
+                bench_clock_.now() - start_time);
+            common_log.info("[{}] /api/rhyme/dislike: responded in {}ms", remote_addr, diff.count());
         });
 
     return server.listen(std::string(host), port);
+}
+
+RyfmachServer::~RyfmachServer() {
+    spdlog::shutdown();
 }
 
 } // namespace ryfmach::app
