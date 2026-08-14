@@ -203,17 +203,27 @@ void WriteJson(httplib::Response& res, int status, const json& body) {
     res.set_content(body.dump(), "application/json");
 }
 
-void LogTopRhymes(const RhymesResult& result, size_t top_k) {
-    for (const auto& word : result.rhymes_list) {
+void LogRhymesResponse(const RhymesResult& result, size_t top_k) {
+    if (result.status == RhymeResolutionStatus::kNotFound) {
+        rhymes_log.debug("Word not found, try manual accent");
+    } else if (result.status == RhymeResolutionStatus::kNeedsChoice) {
+        std::string variants;
+        for (const auto& word : result.variants) {
+            variants += word.dictionary_entry.word + " (" +
+                std::to_string(word.dictionary_entry.accent) + ", " + 
+                word.dictionary_entry.part_of_speech + ")  ";
+        }
+        rhymes_log.debug("Several word variants: {}", variants);
+    } else if (result.status == RhymeResolutionStatus::kResolved) {
         std::string top_rhymes;
-        for (int i = 0; i < top_k && i < (int)word.rhymes.size(); ++i) {
-            top_rhymes += word.rhymes[i].word + "  ";
+        for (int i = 0; i < top_k && i < (int)result.rhymes.size(); ++i) {
+            top_rhymes += result.rhymes[i].word + "  ";
         }
         rhymes_log.debug("Rhymes to word \"{}\" ({}, {}):  {} rhymes:  {}",
-            word.word_variant.word,
-            word.word_variant.accent,
-            word.word_variant.part_of_speech,
-            word.rhymes.size(),
+            result.selected_variant->dictionary_entry.word,
+            result.selected_variant->dictionary_entry.accent,
+            result.selected_variant->dictionary_entry.part_of_speech,
+            result.rhymes.size(),
             top_rhymes
         );
     }
@@ -248,7 +258,7 @@ void HandleRhymesRequest(
             result = service.FindRhymes(word, filters);
         }
 
-        LogTopRhymes(result, 5);
+        LogRhymesResponse(result, 5);
         WriteJson(res, 200, RhymesResultToJson(result));
     } catch (const json::exception&) {
         common_log.error("Failed to find rhymes: wrong format");
