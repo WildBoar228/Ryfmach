@@ -444,6 +444,9 @@ RyfmachServer::RyfmachServer(RyfmachService& service)
 
 bool RyfmachServer::Listen(std::string_view host, int port) const {
     httplib::Server server;
+    server.new_task_queue = [] {
+        return new httplib::ThreadPool(2);
+    };
 
     server.Get(
         "/health",

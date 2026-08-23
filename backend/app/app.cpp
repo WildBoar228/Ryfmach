@@ -54,7 +54,7 @@ int main() {
     ryfmach::app::common_log.info("Ryfmach is listening on {}:{}", host, port);
     if (!server.Listen(host, port)) {
         ryfmach::app::common_log.error("failed to bind {}:{}", host, port);
-        return 1;
+        return 2;
     }
 
     return 0;
