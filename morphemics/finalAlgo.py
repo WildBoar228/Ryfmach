@@ -1,12 +1,16 @@
 import sqlite3
+import os
 from .Algo1 import algo1
 from .Algo2 import algo2
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", "..", "db", "shared", "Slounik5.db"))
 
 
 def cutHalf(half):
     if half[-1] == "'":
         return [{'type': 2, 'text': half}]
-    conn = sqlite3.connect("Slounik5.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT analysis FROM morph_prefixes WHERE spelling == ?", (half, ))
     razdel = cursor.fetchall()[0][0]
@@ -26,16 +30,22 @@ def cutHalf(half):
             
 
 def razbor(word):
-    conn = sqlite3.connect("Slounik5.db")
+    zluchok = 'no'
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    if word[0:3] == 'па-':
+        word = word[0:2] + word[3:]
+        zluchok = 'ok'
     cursor.execute("SELECT word, analysis FROM morphemics WHERE word == ?", (word, ))
     listikRaz = cursor.fetchall()
     if len(listikRaz) > 0:
+        ansNow = algo1(listikRaz[0][0], listikRaz[0][1])
+        if zluchok != 'no':
+            ansNow['analysis'][0]['text'] = ansNow['analysis'][0]['text'] + '-'
         return algo1(listikRaz[0][0], listikRaz[0][1])
     cursor.execute("SELECT initial_id, word FROM words WHERE word == ?", (word, ))
     listikIDs = cursor.fetchall()
     if len(listikIDs) == 0:
-        print("Word not Found")
         return dict()
     cursor.execute("SELECT word, part_of_speech FROM words WHERE id == ?", (listikIDs[0][0], ))
     abobaList = cursor.fetchall()
@@ -95,7 +105,7 @@ def razbor(word):
 
     cursor.execute("SELECT spelling FROM morph_prefixes WHERE id > ?", (96, ))
     pristavkiTemp = cursor.fetchall()
-    pristavki = ['а', 'аба', 'па', 'на', 'вы', 'пера', 'за']
+    pristavki = ['а', 'аба', 'па', 'на', 'вы', 'пера', 'за', 'с', 'раза', 'у']
     for prist in pristavkiTemp:
         pristavki += list(prist)
     pristavkiPlusApostr = []

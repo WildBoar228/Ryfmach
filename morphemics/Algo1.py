@@ -1,8 +1,12 @@
+import os
 import sqlite3
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", "..", "db", "shared", "Slounik5.db"))
 
 #Разбор пачатковай формы слова
 def algo1(word, analysis):
-    conn = sqlite3.connect("Slounik5.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     dictRazbor = {}
     dictRazbor["sure"] = True
@@ -46,7 +50,7 @@ def algo1(word, analysis):
     else:
         cursor.execute("SELECT spelling FROM morph_prefixes WHERE id > ?", (96, ))
         pristavkiTemp = cursor.fetchall()
-        pristavki = ['а', 'аба', 'па', 'на', 'вы', 'пера', 'за']
+        pristavki = ['а', 'аба', 'па', 'на', 'вы', 'пера', 'за', 'с', 'раза', 'у']
         for prist in pristavkiTemp:
             pristavki += list(prist)
         pristavkiPlusApostr = []

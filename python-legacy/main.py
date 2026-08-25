@@ -1,7 +1,3 @@
-import os
-from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
-
 from flask import (
     Flask, Response,
     session, request,
@@ -12,8 +8,14 @@ from pprint import pprint
 
 from logging.handlers import WatchedFileHandler
 import logging
+import os
 import time
 from http.client import HTTPConnection
+
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'morphemics')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from morphemics.finalAlgo import razbor
 
 from config import (
     FLASK_SECRET_KEY,
