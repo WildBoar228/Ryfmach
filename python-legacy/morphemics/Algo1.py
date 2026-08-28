@@ -1,13 +1,6 @@
-import os
-import sqlite3
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", "..", "db", "shared", "Slounik5.db"))
-
 #Разбор пачатковай формы слова
-def algo1(word, analysis):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+def algo1(word, analysis, connection):
+    cursor = connection.cursor()
     dictRazbor = {}
     dictRazbor["sure"] = True
     dictRazbor["analysis"] = []

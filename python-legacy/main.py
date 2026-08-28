@@ -1,8 +1,9 @@
 from flask import (
     Flask, Response,
-    session, request,
+    g, session, request,
     render_template, send_from_directory, jsonify
 )
+import sqlite3
 import json
 from pprint import pprint
 
@@ -13,8 +14,6 @@ import time
 from http.client import HTTPConnection
 
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'morphemics')))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from morphemics.finalAlgo import razbor
 
 from config import (
@@ -25,6 +24,7 @@ from config import (
     RYFMACH_APP_LOG_PATH,
     RYFMACH_IS_TEST_SITE,
     RYFMACH_JINJA_PORT,
+    SLOUNIK_DB_PATH,
 )
 
 import sys
@@ -59,6 +59,22 @@ app_file_handler.setFormatter(
 
 app.logger.setLevel(logging.INFO)
 app.logger.addHandler(app_file_handler)
+
+
+def get_slounik_db():
+    connection = g.get("slounik_db")
+    if connection is None:
+        database_uri = f"{SLOUNIK_DB_PATH.resolve().as_uri()}?mode=ro"
+        connection = sqlite3.connect(database_uri, uri=True)
+        g.slounik_db = connection
+    return connection
+
+
+@app.teardown_appcontext
+def close_slounik_db(_exception):
+    connection = g.pop("slounik_db", None)
+    if connection is not None:
+        connection.close()
 
 
 @app.context_processor
@@ -125,7 +141,7 @@ def proxy_api(api_path):
                 }), 200
             # Достаем ту самую строку, которую ввел пользователь!
             user_word = str(req_json["word"])
-            tempyDic = razbor(user_word)
+            tempyDic = razbor(user_word, get_slounik_db())
             if len(tempyDic) == 0:
                 return jsonify({
                     "variants": [], 

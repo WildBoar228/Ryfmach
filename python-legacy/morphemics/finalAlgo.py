@@ -1,17 +1,10 @@
-import sqlite3
-import os
 from .Algo1 import algo1
 from .Algo2 import algo2
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", "..", "db", "shared", "Slounik5.db"))
-
-
-def cutHalf(half):
+def cutHalf(half, connection):
     if half[-1] == "'":
         return [{'type': 2, 'text': half}]
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    cursor = connection.cursor()
     cursor.execute("SELECT analysis FROM morph_prefixes WHERE spelling == ?", (half, ))
     razdel = cursor.fetchall()[0][0]
     listik = razdel.split('-')
@@ -29,20 +22,19 @@ def cutHalf(half):
     return ans
             
 
-def razbor(word):
+def razbor(word, connection):
     zluchok = 'no'
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    cursor = connection.cursor()
     if word[0:3] == 'па-':
         word = word[0:2] + word[3:]
         zluchok = 'ok'
     cursor.execute("SELECT word, analysis FROM morphemics WHERE word == ?", (word, ))
     listikRaz = cursor.fetchall()
     if len(listikRaz) > 0:
-        ansNow = algo1(listikRaz[0][0], listikRaz[0][1])
+        ansNow = algo1(listikRaz[0][0], listikRaz[0][1], connection)
         if zluchok != 'no':
             ansNow['analysis'][0]['text'] = ansNow['analysis'][0]['text'] + '-'
-        return algo1(listikRaz[0][0], listikRaz[0][1])
+        return algo1(listikRaz[0][0], listikRaz[0][1], connection)
     cursor.execute("SELECT initial_id, word FROM words WHERE word == ?", (word, ))
     listikIDs = cursor.fetchall()
     if len(listikIDs) == 0:
@@ -54,7 +46,12 @@ def razbor(word):
     cursor.execute("SELECT word, analysis FROM morphemics WHERE word == ?", (pachForm, ))
     listikRaz = cursor.fetchall()
     if len(listikRaz) > 0:
-        return algo2(word, algo1(listikRaz[0][0], listikRaz[0][1]), listikIDs[0][0])
+        return algo2(
+            word,
+            algo1(listikRaz[0][0], listikRaz[0][1], connection),
+            listikIDs[0][0],
+            connection,
+        )
     
     wordNoPost = pachForm
     if part_of_speech == 2:
@@ -69,13 +66,13 @@ def razbor(word):
             if len(listikRaz) > 0:
                 cursor.execute("SELECT initial_id, word FROM words WHERE word == ?", (wordNoPost, ))
                 listikIDs = cursor.fetchall()
-                dicNoPost = algo1(listikRaz[0][0], listikRaz[0][1])
+                dicNoPost = algo1(listikRaz[0][0], listikRaz[0][1], connection)
                 if postEx == 'ца':
                     dicNoPost['analysis'][-1]['text'] = dicNoPost['analysis'][-1]['text'][0:len(dicNoPost['analysis'][-1]['text']) - 1]
                     dicNoPost['analysis'].append({'type': 5, 'text': 'ца'})
                 else:
                     dicNoPost['analysis'].append({'type': 5, 'text': 'ся'})
-                return algo2(word, dicNoPost, listikIDs[0][0])
+                return algo2(word, dicNoPost, listikIDs[0][0], connection)
             
     cursor.execute("SELECT spelling FROM morph_prefixes WHERE id <= ?", (96, ))
     firstHalfTemp = cursor.fetchall()
@@ -87,14 +84,14 @@ def razbor(word):
         firstHalfPlusApostr.append(hsf + "'")
     for half in firstHalf + firstHalfPlusApostr:
         if half == pachForm[0:len(half)]:
-            dictSecHalf = razbor(pachForm[len(half):])
+            dictSecHalf = razbor(pachForm[len(half):], connection)
             if len(dictSecHalf) != 0:
                 dictSecHalf['sure'] = False
-                dictSecHalf['analysis'] = cutHalf(half) + dictSecHalf['analysis']
+                dictSecHalf['analysis'] = cutHalf(half, connection) + dictSecHalf['analysis']
                 if pachForm == word:
                     return dictSecHalf
                 else:
-                    return algo2(word, dictSecHalf, listikIDs[0][0])
+                    return algo2(word, dictSecHalf, listikIDs[0][0], connection)
     
     cursor.execute("SELECT initial_id, word FROM words WHERE word == ?", (word, ))
     listikIDs = cursor.fetchall()
@@ -113,14 +110,14 @@ def razbor(word):
         pristavkiPlusApostr.append(prist + "'")
     for prist in pristavki + pristavkiPlusApostr:
         if prist == pachForm[0:len(prist)]:
-            dictNoPr = razbor(pachForm[len(prist):])
+            dictNoPr = razbor(pachForm[len(prist):], connection)
             if len(dictNoPr) != 0:
                 dictNoPr['sure'] = False
                 dictNoPr['analysis'] = [{'type': 1, 'text': prist}] + dictNoPr['analysis']
                 if pachForm == word:
                     return dictNoPr
                 else:
-                    return algo2(word, dictNoPr, listikIDs[0][0])
+                    return algo2(word, dictNoPr, listikIDs[0][0], connection)
             
     #крайні выпадак
     cursor.execute("SELECT initial_id, word FROM words WHERE word == ?", (word, ))
@@ -141,4 +138,4 @@ def razbor(word):
     if pachForm == word:
         return dictRandom
     else:
-        return algo2(word, dictRandom, listikIDs[0][0])
+        return algo2(word, dictRandom, listikIDs[0][0], connection)

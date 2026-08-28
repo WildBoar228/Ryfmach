@@ -83,6 +83,10 @@ release-directory/
 ├── python/
 │   ├── config.py
 │   ├── main.py
+│   ├── morphemics/
+│   │   ├── Algo1.py
+│   │   ├── Algo2.py
+│   │   └── finalAlgo.py
 │   └── requirements.txt
 ├── .env.example
 └── VERSION
@@ -91,6 +95,10 @@ release-directory/
 A release must not contain or receive a site `.env`, mutable database, or log
 file. Do not copy `.env` into a candidate or current release: the same release
 can be used by test and production at the same time.
+
+The `python/morphemics/` directory is part of the normal application release
+and is imported by `python/main.py`. It is not included in the maintenance
+release, whose application does not expose the morphemics API.
 
 The maintenance release contains the minimum Python and static files needed to
 serve `maintenance.html`. Its application must return HTTP 503 and a
@@ -312,7 +320,8 @@ to come from this repository's CI workflow rather than an untrusted source.
 3. Verify the archive checksum.
 4. Extract into a new, uniquely named release directory. Never extract over an
    existing release.
-5. Verify the required binary, Python, requirements, and frontend files.
+5. Verify the required binary, Python application and morphemics modules,
+   requirements, and frontend files.
 6. Verify that `bin/ryfmach` is executable.
 7. Switch the site with `switch-site-release.sh`. Before changing the release
    symlink, it installs the candidate's `python/requirements.txt` into the
@@ -347,8 +356,9 @@ release.
 5. Restart the `ryfmach.xyz` master launcher.
 6. Verify from SSH that the test C++ API is healthy on its private port.
 7. Verify the test site's `/`, `/phonetics`, and `/morphemics` pages.
-8. Send at least one functional request through the public test `/api`
-   route.
+8. Send functional requests through the public test `/api` routes, including
+   `/api/morphemics`, to verify that the packaged Python modules can read the
+   shared dictionary database.
 9. Verify that a test like/dislike writes only to the test database.
 10. Switch `~/www/ryfmach.by/Ryfmach` directly to the candidate release with
     `switch-site-release.sh`; it restarts the production site and rolls back

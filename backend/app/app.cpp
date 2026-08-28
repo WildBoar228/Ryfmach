@@ -38,8 +38,8 @@ int main() {
     try {
         (void)ryfmach::bel::DefaultSoundCompatibilityTable();
     } catch (const std::exception& exception) {
-        ryfmach::app::common_log.error(
-            "failed to load sound compatibility data: {}", exception.what());
+        std::cerr << "failed to load sound compatibility data: "
+                  << exception.what() << std::endl;
         return 1;
     }
 
@@ -53,6 +53,7 @@ int main() {
 
     ryfmach::app::common_log.info("Ryfmach is listening on {}:{}", host, port);
     if (!server.Listen(host, port)) {
+        std::cerr << "failed to bind " << host << ":" << port << std::endl;
         ryfmach::app::common_log.error("failed to bind {}:{}", host, port);
         return 2;
     }

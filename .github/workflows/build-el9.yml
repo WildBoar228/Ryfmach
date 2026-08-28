@@ -82,7 +82,7 @@ jobs:
 
           mkdir -p \
             "stage/${release_name}/bin" \
-            "stage/${release_name}/python" \
+            "stage/${release_name}/python/morphemics" \
             "stage/${release_name}/frontend" \
             "stage/${release_name}/data" \
             dist
@@ -96,6 +96,12 @@ jobs:
             python-legacy/config.py \
             python-legacy/requirements.txt \
             "stage/${release_name}/python/"
+
+          install -m 0644 \
+            python-legacy/morphemics/Algo1.py \
+            python-legacy/morphemics/Algo2.py \
+            python-legacy/morphemics/finalAlgo.py \
+            "stage/${release_name}/python/morphemics/"
 
           cp -a \
             frontend/static \
@@ -120,6 +126,9 @@ jobs:
             frontend/static/templates/index.html
             python/config.py
             python/main.py
+            python/morphemics/Algo1.py
+            python/morphemics/Algo2.py
+            python/morphemics/finalAlgo.py
             python/requirements.txt
             .env.example
             VERSION
@@ -135,7 +144,18 @@ jobs:
           python3.12 -m venv python-test
           python-test/bin/python -m pip install \
             --requirement "stage/${release_name}/python/requirements.txt"
-          python-test/bin/python -c "import flask, gunicorn"
+          PYTHONPATH="stage/${release_name}/python" \
+          RHYME_LIKES_DB_PATH=/tmp/RhymeLikes.db \
+          SLOUNIK_DB_PATH=/tmp/Slounik5.db \
+          FLASK_SECRET_KEY=release-test-secret \
+          PUBLIC_BASE_URL=https://example.invalid \
+          RYFMACH_IS_TEST_SITE=true \
+          RYFMACH_API_HOST=127.0.0.1 \
+          RYFMACH_API_PORT=8081 \
+          RYFMACH_APP_LOG_PATH=/tmp/release-app.log \
+          RYFMACH_JINJA_PORT=8082 \
+          python-test/bin/python -c \
+            "import gunicorn; from main import app; from morphemics.finalAlgo import razbor"
 
           tar -C stage -czf "dist/${release_name}.tar.gz" "$release_name"
 

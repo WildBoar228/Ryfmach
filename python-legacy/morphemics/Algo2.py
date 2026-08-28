@@ -1,9 +1,4 @@
-import sqlite3
-import os
 from .Algo1 import algo1
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", "..", "db", "shared", "Slounik5.db"))
 
 def noteq(word, razbor):
     listiks = []
@@ -80,14 +75,13 @@ def algo3(wordy, formy, part_of_speech):
 
 
 #Разбор слова з вядомым разборам пачатковай формы слова
-def algo2(word, razbor : dict, initial_id):
+def algo2(word, razbor : dict, initial_id, connection):
     flagEnding = noteq(word, razbor)
     dictRazbor = {}
     dictRazbor["sure"] = False
     dictRazbor["analysis"] = []
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor() 
+    cursor = connection.cursor()
     cursor.execute("SELECT word, part_of_speech FROM words WHERE initial_id == ?", (initial_id, ))
     formsTemp = cursor.fetchall()
     forms = []

@@ -93,7 +93,11 @@ else
         "frontend/static/public/favicon.ico"
         "frontend/static/public/sitemap.xml"
         "frontend/static/templates/index.html"
+        "python/config.py"
         "python/main.py"
+        "python/morphemics/Algo1.py"
+        "python/morphemics/Algo2.py"
+        "python/morphemics/finalAlgo.py"
         "python/requirements.txt"
     )
 fi
