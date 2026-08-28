@@ -61,6 +61,21 @@ app.logger.setLevel(logging.INFO)
 app.logger.addHandler(app_file_handler)
 
 
+morph_file_handler = WatchedFileHandler(RYFMACH_APP_LOG_PATH, encoding="utf-8")
+
+morph_file_handler.setLevel(logging.DEBUG)
+morph_file_handler.setFormatter(
+    logging.Formatter(
+        "[%(asctime)s] %(levelname)s in %(module)s: %(message)s"
+    )
+)
+
+morph_logs = logging.getLogger("morphemics")
+morph_logs.setLevel(logging.DEBUG)
+morph_logs.propagate = False
+morph_logs.addHandler(morph_file_handler)
+
+
 def get_slounik_db():
     connection = g.get("slounik_db")
     if connection is None:
@@ -143,11 +158,18 @@ def proxy_api(api_path):
             user_word = str(req_json["word"])
             tempyDic = razbor(user_word, get_slounik_db())
             if len(tempyDic) == 0:
+                morph_logs.debug(f"Morphemics not found: {user_word}")
                 return jsonify({
                     "variants": [], 
                     "word_found": False
                 }), 200
             else:
+                analyses_str = str(tempyDic.get("analysis"))
+                if tempyDic.get("sure") != True:
+                    analyses_str += " (!)"
+                analyses_str += "   "
+                morph_logs.debug(f"Request morphemics: {user_word} -> {analyses_str}")
+
                 return jsonify({
                     "variants": [tempyDic], 
                     "word_found": True
