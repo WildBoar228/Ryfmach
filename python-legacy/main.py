@@ -12,6 +12,11 @@ import os
 import time
 from http.client import HTTPConnection
 
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'morphemics')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from morphemics.finalAlgo import razbor
+
 from config import (
     FLASK_SECRET_KEY,
     PUBLIC_BASE_URL,
@@ -21,6 +26,11 @@ from config import (
     RYFMACH_IS_TEST_SITE,
     RYFMACH_JINJA_PORT,
 )
+
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'morphemics')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from morphemics.finalAlgo import razbor
 
 API_PATHS = {
     "rhymes",
@@ -102,6 +112,33 @@ def morphemics_page():
 def proxy_api(api_path):
     if api_path not in API_PATHS:
         return jsonify({"error": "Not found"}), 404
+    
+    if api_path == "morphemics": 
+        try:
+            # Получаем JSON от фронтенда
+            req_json = request.get_json(silent=True)  
+            # Проверяем валидность JSON и наличие ключа "word" (как в C++)
+            if not req_json or "word" not in req_json or req_json["word"] is None:
+                return jsonify({
+                    "variants": [], 
+                    "word_found": False
+                }), 200
+            # Достаем ту самую строку, которую ввел пользователь!
+            user_word = str(req_json["word"])
+            tempyDic = razbor(user_word)
+            if len(tempyDic) == 0:
+                return jsonify({
+                    "variants": [], 
+                    "word_found": False
+                }), 200
+            else:
+                return jsonify({
+                    "variants": [tempyDic], 
+                    "word_found": True
+                }), 200
+        except Exception as e:
+            app.logger.error(f"Failed to analyze morphemics in Python: {e}")
+            return jsonify({"error": "Unable to analyze morphemics."}), 500
 
     connection = HTTPConnection(
         RYFMACH_API_HOST,

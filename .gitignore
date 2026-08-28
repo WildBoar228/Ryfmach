@@ -7,3 +7,8 @@ logs/
 .vscode/
 
 .env
+
+.env
+.venv/
+*.db
+*__pycache__
