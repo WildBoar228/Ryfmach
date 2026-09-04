@@ -338,6 +338,7 @@ public:
 
         final_cnt = CleanRhymeWordFamilies(rhymes, best_costs);
         rhymes.resize(final_cnt);
+        SortRhymes(rhymes);
 
         return rhymes;
     }
