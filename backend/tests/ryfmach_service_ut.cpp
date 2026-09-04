@@ -30,7 +30,7 @@ TEST(RyfmachService, ResolvesOneExactPronunciationAndFindsRhymes) {
     EXPECT_EQ(result.selected_variant->dictionary_entry.word, "хата");
     EXPECT_EQ(result.selected_variant->dictionary_entry.accent, 1);
     EXPECT_EQ(result.selected_variant->dictionary_entry.id, 1);
-    EXPECT_EQ(WordIds(result.rhymes), (std::vector<int>{5, 6, 7, 8}));
+    EXPECT_EQ(WordIds(result.rhymes), (std::vector<int>{5, 7, 8, 6}));
 }
 
 TEST(RyfmachService, KeepsDistinctDictionaryWordsWithSamePronunciation) {

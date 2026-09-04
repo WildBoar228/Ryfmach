@@ -174,7 +174,7 @@ TEST(Slounik, FindsWeakRhymesBySoundHash) {
     EXPECT_EQ(RhymeWordIds(rhymes), std::vector<int>{8});
 }
 
-TEST(Slounik, FindsAdaptiveRhymesAcrossMistakeLevels) {
+TEST(Slounik, FindsAndRanksAdaptiveRhymesAcrossMistakeLevels) {
     const ryfmach::bel::Slounik slounik(SharedSlounikTestDatabasePath());
     const auto input_word = slounik.GetWordById(1);
     ASSERT_TRUE(input_word.has_value());
@@ -186,7 +186,7 @@ TEST(Slounik, FindsAdaptiveRhymesAcrossMistakeLevels) {
             ryfmach::bel::SearchMistakeLevel::kAdaptive},
         20);
 
-    EXPECT_EQ(RhymeWordIds(rhymes), (std::vector<int>{5, 6, 7, 8}));
+    EXPECT_EQ(RhymeWordIds(rhymes), (std::vector<int>{5, 7, 8, 6}));
 }
 
 
